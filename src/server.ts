@@ -9,7 +9,7 @@ import MDPClient from './lib/mpd-client';
 
 
 const port = parseInt(process.env.PORT || '7180', 10);
-const MPD_HOST = '10.147.20.1';
+const MPD_HOST = '192.168.100.1';
 const MPD_PORT = 7160
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });

@@ -23,8 +23,23 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 ## WS Command
 
 ```js
-{ "type": "PLAY","data": null}
+{ "type": "PLAY"}
+{ "type": "PAUSE"}
+{ "type": "REQUEST_STATUS"}
+{ "type": "REQUEST_ELAPSED"}
+{ "type": "GET_VOL"}
+{ "type": "SET_VOL","data": 20}
+{ "type": "REPEAT","data": true}
+{ "type": "RANDOM","data": true}
+{ "type": "QUEUE"}
+playlistinfo
+
+
 ```
+
+## 参考
+
+https://github.com/ondras/cyp/blob/master/app/js/mpd.ts
 
 ## Learn More
 

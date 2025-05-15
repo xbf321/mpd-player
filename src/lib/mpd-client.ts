@@ -2,6 +2,7 @@
 const mpd = require('mpd');
 const cmd = mpd.cmd;
 const debug = require('debug')('player:mpd-client');
+const parser = require('./parser');
 
 enum MPDStatus {
   disconnected = 1,
@@ -61,31 +62,71 @@ class MDPClient {
     });
     this.client = client;
   }
-  play(cb) {
-    this._sendPlay(true, cb);
+  play(callback) {
+    this._sendPlay(true, callback);
   }
-  pause(cb) {
-    this._sendPlay(false, cb);
+  pause(callback) {
+    this._sendPlay(false, callback);
   }
-  repeat(on: boolean) {}
-  volume(number: number) {}
+  repeat(on: boolean = false, callback) {
+    this._sendCommands(cmd('repeat', [on ? 1 : 0]), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
+  }
+  getStatus(callback) {
+    this._sendStatusRequest(callback)
+  }
+  getElapsed(callback) {
+    this._sendElapsedRequest(callback);
+  }
+  getVolumn(callback) {
+    this._sendCommands(cmd('getvol', []), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, msg);
+    });
+  }
+  getQueue(callback) {
+    this._sendCommands(cmd('playlistinfo', []), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      let list = mpd.parseArrayMessage(msg);
+      callback(null, list);
+    });
+  }
+  setRandom(on: boolean, callback) {
+    this._sendCommands(cmd('random', [on ? 1 : 0]), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, msg);
+    });
+  }
+  setVolumn(value: number, callback) {
+    this._sendCommands(cmd('setvol', [value]), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, msg);
+    });
+  }
   onStatusChange(callback) {
     this.updateClients.push(callback);
   }
   _sendPlay(play: boolean, callback) {
     debug('_sendPlay', play);
-    const command = 'play';
-    let arg = [];
-    if (!play) {
-      command = 'pause';
-      arg = [1];
-    }
-
+    const command = play ? 'play' : 'pause';
+    const arg = play ? [] : [1];
     this._sendCommands(cmd(command, arg), (err, msg) => {
       if (err) {
         return callback(err);
       }
-      callback(null);
+      callback(null, msg);
     });
   }
   _sendCommands(commands, callback) {
@@ -116,6 +157,23 @@ class MDPClient {
       const status = mpd.parseKeyValueMessage(msg);
       callback(null, status);
     });
+  }
+  _sendElapsedRequest(callback) {
+    this._sendCommands(cmd("status", []),
+      (err, msg) => {
+        if (err) {
+          return callback(err);
+        }
+        const data = mpd.parseKeyValueMessage(msg);
+        var elapsed = { elapsed: 0 };
+        for (const [key, value] of Object.entries(data)) {
+          if (key.toLowerCase() === 'elapsed') {
+            elapsed.elapsed = value;
+            break;
+          }
+        }
+        callback(null, elapsed);
+      });
   }
 }
 
