@@ -43,12 +43,17 @@ class MDPClient {
       if (name === 'playlist' || name === 'player') {
         this._sendStatusRequest((error, status) => {
           if (!error) {
-            debug('updateClients', this.updateClients, status)
+            debug('updateClients', status , '|');
             this.updateClients.forEach((callback) => {
               callback(status);
             });
           }
         });
+        // this.getQueue((error, list) => {
+        //   if (!error) {
+
+        //   }
+        // });
       }
     });
     client.on('end', () => {
@@ -62,14 +67,42 @@ class MDPClient {
     });
     this.client = client;
   }
-  play(callback) {
-    this._sendPlay(true, callback);
+  play(postion, callback) {
+    const arg = postion ? [postion] : [];
+    debug('play postion', postion);
+    this._sendCommands(cmd('play', arg), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, msg);
+    });
   }
   pause(callback) {
-    this._sendPlay(false, callback);
+    this._sendCommands(cmd('pause', [1]), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null, msg);
+    });
   }
   repeat(on: boolean = false, callback) {
-    this._sendCommands(cmd('repeat', [on ? 1 : 0]), (err, msg) => {
+    this._sendCommands(cmd('repeat', [on ? 1 : 0]), (err) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
+  }
+  next(callback) {
+    this._sendCommands(cmd('next', []), (err) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
+  }
+  previous(callback) {
+    this._sendCommands(cmd('previous', []), (err) => {
       if (err) {
         return callback(err);
       }
@@ -77,7 +110,7 @@ class MDPClient {
     });
   }
   getStatus(callback) {
-    this._sendStatusRequest(callback)
+    this._sendStatusRequest(callback);
   }
   getElapsed(callback) {
     this._sendElapsedRequest(callback);
@@ -95,7 +128,25 @@ class MDPClient {
       if (err) {
         return callback(err);
       }
-      let list = mpd.parseArrayMessage(msg);
+      const rawList = mpd.parseArrayMessage(msg);
+      debug('rawListxxxxxxxxx', rawList);
+      const list = rawList.map((item) => {
+        const {
+          id, Id,
+          time, Time,
+          duration, Duration,
+          file, File,
+          pos, Pos,
+        } = item;
+        return {
+          id: id || Id,
+          time: time || Time,
+          duration: duration || Duration,
+          title: file || File,
+          pos: pos || Pos,
+        };
+      }).filter((item) => item.title);
+
       callback(null, list);
     });
   }
@@ -117,17 +168,6 @@ class MDPClient {
   }
   onStatusChange(callback) {
     this.updateClients.push(callback);
-  }
-  _sendPlay(play: boolean, callback) {
-    debug('_sendPlay', play);
-    const command = play ? 'play' : 'pause';
-    const arg = play ? [] : [1];
-    this._sendCommands(cmd(command, arg), (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null, msg);
-    });
   }
   _sendCommands(commands, callback) {
     try {
@@ -154,26 +194,53 @@ class MDPClient {
       if (err) {
         return callback(err);
       }
-      const status = mpd.parseKeyValueMessage(msg);
-      callback(null, status);
+      
+      const data = mpd.parseKeyValueMessage(msg);
+      const {
+        id, Id,
+        duration, Duration, 
+        volume, Volume, 
+        time, Time,
+        pos, Pos,
+        elapsed, Elapsed,
+        random, Random,
+        repeat, Repeat,
+        state, State,
+        songid, Songid,
+        file, File,
+      } = data;
+      debug('rawData', data);
+      const songInfo = {
+        id: id || Id,
+        duration: duration || Duration,
+        volume: volume || Volume,
+        time: time || Time,
+        title: file || File,
+        elapsed: elapsed || Elapsed,
+        random: random || Random,
+        repeat: repeat || Repeat,
+        state: state || State,
+        songId: songid || Songid,
+        pos: pos || Pos,
+      };
+      callback(null, songInfo);
     });
   }
   _sendElapsedRequest(callback) {
-    this._sendCommands(cmd("status", []),
-      (err, msg) => {
-        if (err) {
-          return callback(err);
+    this._sendCommands(cmd('status', []), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      const data = mpd.parseKeyValueMessage(msg);
+      let elapsed = 0;
+      for (const [key, value] of Object.entries(data)) {
+        if (key.toLowerCase() === 'elapsed') {
+          elapsed = value;
+          break;
         }
-        const data = mpd.parseKeyValueMessage(msg);
-        var elapsed = { elapsed: 0 };
-        for (const [key, value] of Object.entries(data)) {
-          if (key.toLowerCase() === 'elapsed') {
-            elapsed.elapsed = value;
-            break;
-          }
-        }
-        callback(null, elapsed);
-      });
+      }
+      callback(null, elapsed);
+    });
   }
 }
 

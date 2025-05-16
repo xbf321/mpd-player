@@ -27,9 +27,8 @@ class SocketIO {
 
     io.on('connection', (socket) => {
       this.socket = socket;
-      debug('connection');
+      debug('scoketServer -> connection');
       socket.on(MessageType.MESSAGE_EVENT, (type, data) => this.onMessage(type, data));
-      // ...
     });
     mpd.onStatusChange((status) => {
       this.broadcastMessage(MessageType.STATUS, status);
@@ -39,68 +38,30 @@ class SocketIO {
   broadcastMessage(type, rawData) {
     const data = objectToLowerCase(rawData);
     debug('Broadcast: ' + type + ' with %o', data);
-    this.io.emit(MessageType.MESSAGE_EVENT, type, data);
+    this.io.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
   sendError(err) {
-    this.sendMessage(MessageType.MPD_OFFLINE, err);
+    this.sendMessage(MessageType.MPD_OFFLINE, err.message);
+  }
+  serializeMessage(type, data) {
+    return JSON.stringify({
+      type: type,
+      payload: data ? data : null,
+    });
   }
   sendMessage(type, data) {
     if (!this.socket) {
       debug('this.socket is null');
       return;
     }
-    this.socket.emit(MessageType.MESSAGE_EVENT, type, data);
+    this.socket.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
-  onMessage(type, data) {
+  onMessage(msg) {
+    const { type, payload: data } = JSON.parse(msg);
     debug('Received %s with %o', type, data);
     switch (type) {
-      /*
-      case 'REPEAT':
-        mpd.repeat(data, (err) => {
-          if (err) {
-            debug('PAUSE', err);
-            this.sendMessage(ws, 'MPD_OFFLINE');
-          }
-        });
-        break;
-      case 'GET_VOL':
-        mpd.getVolumn((err, status) => {
-          if (err) {
-            return this.sendMessage(ws, 'MPD_OFFLINE', null);
-          }
-          this.sendMessage(ws, 'STATUS', status);
-        });
-        break;
-      case 'SET_VOL':
-        mpd.setVolumn(data, (err, status) => {
-          if (err) {
-            return this.sendMessage(ws, 'MPD_OFFLINE', null);
-          }
-          this.sendMessage(ws, 'STATUS', status);
-        });
-        break;
-      
-      case 'REQUEST_ELAPSED':
-        mpd.getElapsed((err, elapsed) => {
-          if (err) {
-            return this.sendMessage(ws, 'MPD_OFFLINE', null);
-          }
-          this.sendMessage(ws, 'ELAPSED', elapsed);
-        });
-        break;
-      
-      */
-      case MessageType.RANDOM:
-        this.mpd.setRandom(data, (err, msg) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.RANDOM);
-        });
-        break;
       case MessageType.PLAY:
-        this.mpd.play((err) => {
+        this.mpd.play(data, (err) => {
           if (err) {
             this.sendError(err);
             return;
@@ -109,6 +70,48 @@ class SocketIO {
         break;
       case MessageType.PAUSE:
         this.mpd.pause((err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+        });
+        break;
+      case MessageType.SET_VOL:
+        this.mpd.setVolumn(data, (err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          // status -> mixer 没什么用
+        });
+        break;
+      case MessageType.REPEAT:
+        this.mpd.repeat(data, (err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+        });
+        break;
+      case MessageType.RANDOM:
+        this.mpd.setRandom(data, (err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.RANDOM);
+        });
+        break;
+      case MessageType.PREVIOUS:
+        this.mpd.previous((err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+        });
+        break;
+      case MessageType.NEXT:
+        this.mpd.next((err) => {
           if (err) {
             this.sendError(err);
             return;
@@ -124,13 +127,22 @@ class SocketIO {
           this.sendMessage(MessageType.STATUS, status);
         });
         break;
-      case MessageType.QUEUE:
+      case MessageType.REQUEST_QUEUE:
         this.mpd.getQueue((err, list) => {
           if (err) {
             this.sendError(err);
             return;
           }
           this.sendMessage(MessageType.QUEUE, list);
+        });
+        break;
+      case MessageType.REQUEST_ELAPSED:
+        this.mpd.getElapsed((err, elapsed) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.ELAPSED, elapsed);
         });
         break;
     }

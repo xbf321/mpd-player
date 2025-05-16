@@ -1,10 +1,9 @@
-// @ts-nocheck
 'use client';
 import clsx from 'clsx';
 import { useState, useEffect } from 'react';
 import { socket } from '@/socket';
 
-import Player from '@/components/Player';
+import Player, { PlayStatus } from '@/components/Player';
 import SongList from '@/components/SongList';
 
 import { MessageType } from '@/lib/constant';
@@ -18,19 +17,38 @@ export default function Home() {
     loading: true,
     data: [],
   });
-  const [songStatus, setSongStatus] = useState({
+  const [songInfo, setSongInfo] = useState({
     loading: true,
     data: null,
   });
+  const [currentPlaySongId, setCurrentPlaySongId] = useState(-1);
+
   useInterval(() => {
+    if (!songInfo) {
+      return;
+    }
+    const { state = '' } = songInfo.data;
+    if (state !== PlayStatus.PLAY) {
+      return;
+    }
+    console.info('songIfo', songInfo);
+    sendMessage(MessageType.REQUEST_ELAPSED);
+  }, 800);
+
+  const sendMessage = (type = '', data = null) => {
+    const msg = {
+      type: type,
+      payload: data ? data : null,
+    };
     if (!socket.connected) {
       return;
     }
-    // socket.emit(MessageType.MESSAGE_EVENT, MessageType.REQUEST_STATUS);
-  }, 3000);
+    socket.emit(MessageType.MESSAGE_EVENT, JSON.stringify(msg));
+  };
 
-  const onMessage = (type, data) => {
-    console.info('client -> onMessage', type, data);
+  const receiveMessage = (msg: any) => {
+    console.info('client -> receiveMessage', msg);
+    const { type, payload: data } = JSON.parse(msg);
     switch (type) {
       case MessageType.QUEUE:
         setQueue({
@@ -40,45 +58,72 @@ export default function Home() {
         });
         break;
       case MessageType.STATUS:
-        setSongStatus({
-          loading: false,
-          data,
-        });
+        {
+          const updatedSong = {
+            loading: false,
+            data: {
+              ...data,
+            },
+          };
+          setSongInfo(updatedSong);
+          setCurrentPlaySongId(data.id);
+        }
+        break;
+      case MessageType.ELAPSED:
+        {
+          setSongInfo(({ loading, data: songInfo }) => {
+            return {
+              loading,
+              data: {
+                ...songInfo,
+                elapsed: data,
+              },
+            };
+          });
+        }
         break;
     }
   };
 
-  const handlePlayerPlay = () => {
-    socket.emit(MessageType.MESSAGE_EVENT, MessageType.PLAY);
+  const handlePlay = (pos = null) => {
+    sendMessage(MessageType.PLAY, pos);
   };
 
-  const handlePlayerPause = () => {
-    socket.emit(MessageType.MESSAGE_EVENT, MessageType.PAUSE);
+  const handlePause = () => {
+    sendMessage(MessageType.PAUSE);
   };
 
-  const handleVolumeChanage = (nextValue) => {
+  const handleVolumeChanage = (nextValue: number) => {
+    sendMessage(MessageType.SET_VOL, nextValue);
+  };
 
+  const handleNext = () => {
+    sendMessage(MessageType.NEXT);
+  };
+
+  const handlePrevious = () => {
+    sendMessage(MessageType.PREVIOUS);
   };
 
   useEffect(() => {
-    if (socket.connected) {
-      onConnect();
-    }
-
-    function onConnect() {
+    const onConnect = () => {
       setIsConnected(true);
       setTransport(socket.io.engine.transport.name);
-      socket.on(MessageType.MESSAGE_EVENT, onMessage);
+      socket.on(MessageType.MESSAGE_EVENT, receiveMessage);
       socket.io.engine.on('upgrade', (transport) => {
         setTransport(transport.name);
       });
-      socket.emit(MessageType.MESSAGE_EVENT, MessageType.QUEUE);
-      socket.emit(MessageType.MESSAGE_EVENT, MessageType.REQUEST_STATUS);
-    }
+      sendMessage(MessageType.REQUEST_QUEUE);
+      sendMessage(MessageType.REQUEST_STATUS);
+    };
 
-    function onDisconnect() {
+    const onDisconnect = () => {
       setIsConnected(false);
       setTransport('N/A');
+    };
+
+    if (socket.connected) {
+      onConnect();
     }
 
     socket.on('connect', onConnect);
@@ -93,15 +138,18 @@ export default function Home() {
   const handleTabChange = (value: number) => {
     setSelectedTab(value);
   };
+
   return (
     <>
       <p>Status: {isConnected ? 'connected' : 'disconnected'}</p>
       <p>Transport: {transport}</p>
       <Player
-        loading={songStatus.loading}
-        data={songStatus.data}
-        onPlay={handlePlayerPlay}
-        onPause={handlePlayerPause}
+        loading={songInfo.loading}
+        data={songInfo.data}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
         onVolumn={handleVolumeChanage}
       />
       <div className="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700 mb-4">
@@ -134,7 +182,12 @@ export default function Home() {
           </li> */}
         </ul>
       </div>
-      <SongList loading={queue.loading} data={queue.data} />
+      <SongList
+        playId={currentPlaySongId}
+        loading={queue.loading}
+        data={queue.data}
+        onPlay={handlePlay}
+      />
     </>
   );
 }

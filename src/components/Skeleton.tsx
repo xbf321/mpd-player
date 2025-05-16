@@ -1,4 +1,3 @@
-// @ts-nocheck
 export default function Skeleton() {
   return (
     <div className="flex flex-col gap-2">
