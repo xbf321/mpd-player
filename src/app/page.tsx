@@ -1,33 +1,36 @@
 'use client';
 import clsx from 'clsx';
 import { useState, useEffect } from 'react';
-import { socket } from '@/socket';
 
-import Player, { PlayStatus } from '@/components/Player';
 import SongList from '@/components/SongList';
+import Player, { PlayStatus } from '@/components/Player';
 
 import { MessageType } from '@/lib/constant';
+import { socket } from '@/lib/socket-client';
 import useInterval from '@/hooks/useInterval';
 
 export default function Home() {
   const [selectedTab, setSelectedTab] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
-  const [transport, setTransport] = useState('N/A');
-  const [queue, setQueue] = useState({
-    loading: true,
-    data: [],
-  });
+  const [currentPlaySongId, setCurrentPlaySongId] = useState(-1);
   const [songInfo, setSongInfo] = useState({
     loading: true,
     data: null,
   });
-  const [currentPlaySongId, setCurrentPlaySongId] = useState(-1);
+  const [queue, setQueue] = useState({
+    loading: true,
+    data: [],
+  });
+  const [libray, setLibray] = useState({
+    loading: true,
+    data: [],
+  });
 
   useInterval(() => {
-    if (!songInfo) {
+    if (!songInfo.data) {
       return;
     }
-    const { state = '' } = songInfo.data;
+    const { state } = songInfo.data;
     if (state !== PlayStatus.PLAY) {
       return;
     }
@@ -82,11 +85,17 @@ export default function Home() {
           });
         }
         break;
+      case MessageType.LIBARY:
+        setLibray({
+          loading: false,
+          data,
+        });
+        break;
     }
   };
 
-  const handlePlay = (pos = null) => {
-    sendMessage(MessageType.PLAY, pos);
+  const handlePlay = (id = null) => {
+    sendMessage(MessageType.PLAY, id);
   };
 
   const handlePause = () => {
@@ -108,18 +117,14 @@ export default function Home() {
   useEffect(() => {
     const onConnect = () => {
       setIsConnected(true);
-      setTransport(socket.io.engine.transport.name);
       socket.on(MessageType.MESSAGE_EVENT, receiveMessage);
-      socket.io.engine.on('upgrade', (transport) => {
-        setTransport(transport.name);
-      });
-      sendMessage(MessageType.REQUEST_QUEUE);
       sendMessage(MessageType.REQUEST_STATUS);
+      sendMessage(MessageType.REQUEST_QUEUE);
+      sendMessage(MessageType.REQUEST_LIBARY);
     };
 
     const onDisconnect = () => {
       setIsConnected(false);
-      setTransport('N/A');
     };
 
     if (socket.connected) {
@@ -142,7 +147,6 @@ export default function Home() {
   return (
     <>
       <p>Status: {isConnected ? 'connected' : 'disconnected'}</p>
-      <p>Transport: {transport}</p>
       <Player
         loading={songInfo.loading}
         data={songInfo.data}
@@ -167,7 +171,7 @@ export default function Home() {
               Queue
             </a>
           </li>
-          {/* <li className="me-2" onClick={() => handleTabChange(1)}>
+          <li className="me-2" onClick={() => handleTabChange(1)}>
             <a
               className={clsx({
                 'inline-block p-4 border-b-2 border-transparent rounded-t-lg cursor-pointer': true,
@@ -179,15 +183,23 @@ export default function Home() {
             >
               Libray
             </a>
-          </li> */}
+          </li>
         </ul>
       </div>
-      <SongList
-        playId={currentPlaySongId}
-        loading={queue.loading}
-        data={queue.data}
-        onPlay={handlePlay}
-      />
+      {selectedTab === 0 && (
+        <SongList
+          playId={currentPlaySongId}
+          loading={queue.loading}
+          data={queue.data}
+          onSelect={handlePlay}
+        />
+      )}
+      {selectedTab === 1 && (
+        <SongList
+          loading={queue.loading}
+          data={libray.data}
+        />
+      )}
     </>
   );
 }

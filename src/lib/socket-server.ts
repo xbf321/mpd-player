@@ -22,17 +22,33 @@ class SocketIO {
   socket = null;
   constructor(httpServer, mpd) {
     const io = new Server(httpServer);
-    this.io = io;
-    this.mpd = mpd;
-
     io.on('connection', (socket) => {
       this.socket = socket;
       debug('scoketServer -> connection');
-      socket.on(MessageType.MESSAGE_EVENT, (type, data) => this.onMessage(type, data));
+      socket.on(MessageType.MESSAGE_EVENT, (type, data) => this.recieveMessage(type, data));
     });
-    mpd.onStatusChange((status) => {
-      this.broadcastMessage(MessageType.STATUS, status);
+    mpd.onSystemChange((name) => {
+      debug('MPDSystem update received: ' + name);
+      if (name === 'player') {
+        this.mpd.getStatus((err, status) => {
+          if (err) {
+            return;
+          }
+          this.sendMessage(MessageType.STATUS, status);
+        });
+      }
+      if (name === 'playlist') {
+        this.mpd.getQueue((err, list) => {
+          if (err) {
+            return;
+          }
+          this.sendMessage(MessageType.QUEUE, list);
+        });
+      }
+      
     });
+    this.io = io;
+    this.mpd = mpd;
   }
 
   broadcastMessage(type, rawData) {
@@ -56,7 +72,7 @@ class SocketIO {
     }
     this.socket.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
-  onMessage(msg) {
+  recieveMessage(msg) {
     const { type, payload: data } = JSON.parse(msg);
     debug('Received %s with %o', type, data);
     switch (type) {
@@ -143,6 +159,15 @@ class SocketIO {
             return;
           }
           this.sendMessage(MessageType.ELAPSED, elapsed);
+        });
+        break;
+      case MessageType.REQUEST_LIBARY:
+        this.mpd.getLibary((err, list) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.LIBARY, list);
         });
         break;
     }

@@ -9,12 +9,12 @@ export default function SongList({
   loading = true,
   data = [],
   playId = -1,
-  onPlay,
+  onSelect,
 }: {
   loading: boolean;
   data: any;
-  playId: number | string;
-  onPlay: (id: number | string) => void;
+  playId?: number | string;
+  onSelect?: (id?: number | string) => void;
 }) {
   if (loading) {
     return <Skeleton />;
@@ -31,7 +31,7 @@ export default function SongList({
           <div
             className="flex gap gap-3 cursor-pointer"
             key={index}
-            onClick={() => onPlay(item.pos)}
+            onClick={() => onSelect(item.id)}
           >
             <span
               className={clsx({

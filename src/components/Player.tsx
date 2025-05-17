@@ -55,7 +55,6 @@ export default function Player({
   }, [data]);
 
   const handleVolumeChange = debounce((nextValue) => {
-    setVolume(nextValue);
     onVolumn?.(nextValue);
   }, 300);
 
@@ -110,7 +109,10 @@ export default function Player({
       </div>
       <div className="flex gap gap-2 items-center">
         <span className="material-symbols-outlined">volume_mute</span>
-        <Slider min={0} max={100} onChange={handleVolumeChange} value={volume} />
+        <Slider min={0} max={100} onChange={(nextValue) => {
+          setVolume(nextValue as number);
+          handleVolumeChange(nextValue)
+        }} value={volume} />
         <span className="material-symbols-outlined">volume_up</span>
       </div>
     </div>

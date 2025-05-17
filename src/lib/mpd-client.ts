@@ -2,7 +2,6 @@
 const mpd = require('mpd');
 const cmd = mpd.cmd;
 const debug = require('debug')('player:mpd-client');
-const parser = require('./parser');
 
 enum MPDStatus {
   disconnected = 1,
@@ -14,7 +13,6 @@ class MDPClient {
   status = MPDStatus.disconnected;
   host = '';
   port = 0;
-  updateClients = [];
   constructor(host, port) {
     this.host = host;
     this.port = port;
@@ -38,24 +36,6 @@ class MDPClient {
       debug('MPD client ready and connected to ' + this.host + ':' + this.port);
       this.status = MPDStatus.ready;
     });
-    client.on('system', (name) => {
-      debug('System update received: ' + name);
-      if (name === 'playlist' || name === 'player') {
-        this._sendStatusRequest((error, status) => {
-          if (!error) {
-            debug('updateClients', status , '|');
-            this.updateClients.forEach((callback) => {
-              callback(status);
-            });
-          }
-        });
-        // this.getQueue((error, list) => {
-        //   if (!error) {
-
-        //   }
-        // });
-      }
-    });
     client.on('end', () => {
       debug('Connection ended');
       this.retryConnect();
@@ -67,10 +47,14 @@ class MDPClient {
     });
     this.client = client;
   }
-  play(postion, callback) {
-    const arg = postion ? [postion] : [];
-    debug('play postion', postion);
-    this._sendCommands(cmd('play', arg), (err, msg) => {
+  onSystemChange(callback) {
+    this.client.on('system', (name) => {
+      callback(name);
+    });
+  }
+  play(id, callback) {
+    const arg = id ? [id] : [];
+    this._sendCommands(cmd('playid', arg), (err, msg) => {
       if (err) {
         return callback(err);
       }
@@ -110,10 +94,63 @@ class MDPClient {
     });
   }
   getStatus(callback) {
-    this._sendStatusRequest(callback);
+    this._sendCommands([cmd('currentsong', []), cmd('status', [])], (err, msg) => {
+      debug('_sendStatusRequest', err, msg);
+      if (err) {
+        return callback(err);
+      }
+
+      const data = mpd.parseKeyValueMessage(msg);
+      const {
+        id,
+        Id,
+        duration,
+        Duration,
+        volume,
+        Volume,
+        elapsed,
+        Elapsed,
+        random,
+        Random,
+        repeat,
+        Repeat,
+        state,
+        State,
+        songid,
+        Songid,
+        file,
+        File,
+      } = data;
+      debug('rawData', data);
+      const songInfo = {
+        id: id || Id,
+        duration: duration || Duration,
+        volume: volume || Volume,
+        title: file || File,
+        elapsed: elapsed || Elapsed,
+        random: random || Random,
+        repeat: repeat || Repeat,
+        state: state || State,
+        songId: songid || Songid,
+      };
+      callback(null, songInfo);
+    });
   }
   getElapsed(callback) {
-    this._sendElapsedRequest(callback);
+    this._sendCommands(cmd('status', []), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      const data = mpd.parseKeyValueMessage(msg);
+      let elapsed = 0;
+      for (const [key, value] of Object.entries(data)) {
+        if (key.toLowerCase() === 'elapsed') {
+          elapsed = value;
+          break;
+        }
+      }
+      callback(null, elapsed);
+    });
   }
   getVolumn(callback) {
     this._sendCommands(cmd('getvol', []), (err, msg) => {
@@ -128,25 +165,32 @@ class MDPClient {
       if (err) {
         return callback(err);
       }
-      const rawList = mpd.parseArrayMessage(msg);
-      debug('rawListxxxxxxxxx', rawList);
-      const list = rawList.map((item) => {
-        const {
-          id, Id,
-          time, Time,
-          duration, Duration,
-          file, File,
-          pos, Pos,
-        } = item;
-        return {
-          id: id || Id,
-          time: time || Time,
-          duration: duration || Duration,
-          title: file || File,
-          pos: pos || Pos,
-        };
-      }).filter((item) => item.title);
-
+      const list = this._transformList(msg);
+      callback(null, list);
+    });
+  }
+  clearQueue(callback) {
+    this._sendCommands(cmd('clear', []), (err) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
+  }
+  deleteSong(id) {
+    this._sendCommands(cmd('deleteid', [id]), (err) => {
+      if (err) {
+        return callback(err);
+      }
+      callback(null);
+    });
+  }
+  getLibary(callback) {
+    this._sendCommands(cmd('lsinfo', []), (err, msg) => {
+      if (err) {
+        return callback(err);
+      }
+      const list = this._transformList(msg);
       callback(null, list);
     });
   }
@@ -165,9 +209,6 @@ class MDPClient {
       }
       callback(null, msg);
     });
-  }
-  onStatusChange(callback) {
-    this.updateClients.push(callback);
   }
   _sendCommands(commands, callback) {
     try {
@@ -188,59 +229,20 @@ class MDPClient {
       callback(err);
     }
   }
-  _sendStatusRequest(callback) {
-    this._sendCommands([cmd('currentsong', []), cmd('status', [])], (err, msg) => {
-      debug('_sendStatusRequest', err, msg);
-      if (err) {
-        return callback(err);
-      }
-      
-      const data = mpd.parseKeyValueMessage(msg);
-      const {
-        id, Id,
-        duration, Duration, 
-        volume, Volume, 
-        time, Time,
-        pos, Pos,
-        elapsed, Elapsed,
-        random, Random,
-        repeat, Repeat,
-        state, State,
-        songid, Songid,
-        file, File,
-      } = data;
-      debug('rawData', data);
-      const songInfo = {
-        id: id || Id,
-        duration: duration || Duration,
-        volume: volume || Volume,
-        time: time || Time,
-        title: file || File,
-        elapsed: elapsed || Elapsed,
-        random: random || Random,
-        repeat: repeat || Repeat,
-        state: state || State,
-        songId: songid || Songid,
-        pos: pos || Pos,
-      };
-      callback(null, songInfo);
-    });
-  }
-  _sendElapsedRequest(callback) {
-    this._sendCommands(cmd('status', []), (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      const data = mpd.parseKeyValueMessage(msg);
-      let elapsed = 0;
-      for (const [key, value] of Object.entries(data)) {
-        if (key.toLowerCase() === 'elapsed') {
-          elapsed = value;
-          break;
-        }
-      }
-      callback(null, elapsed);
-    });
+  _transformList(data) {
+    const rawList = mpd.parseArrayMessage(data);
+    debug('_transformList -> rawList', rawList);
+    const list = rawList
+      .map((item) => {
+        const { id, Id, duration, Duration, file, File } = item;
+        return {
+          id: id || Id,
+          duration: duration || Duration,
+          title: file || File,
+        };
+      })
+      .filter((item) => item.title);
+    return list;
   }
 }
 
