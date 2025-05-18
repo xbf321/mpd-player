@@ -11,7 +11,7 @@ const useInterval = (fn: () => void, delay?: number, options: { immediate?: bool
   }, []);
 
   useEffect(() => {
-    if (delay < 0) {
+    if (!delay || delay < 0) {
       return;
     }
     if (options.immediate) {

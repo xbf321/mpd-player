@@ -13,13 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=pause,play_circle,skip_next,skip_previous,volume_mute,volume_up"
-        />
-      </head>
-      <body className="p-4">{children}</body>
+      <body className="p-4 flex flex-col h-screen">{children}</body>
     </html>
   );
 }

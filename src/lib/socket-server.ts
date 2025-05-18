@@ -29,7 +29,7 @@ class SocketIO {
     });
     mpd.onSystemChange((name) => {
       debug('MPDSystem update received: ' + name);
-      if (name === 'player') {
+      if (name === 'player' || name === 'mixer') {
         this.mpd.getStatus((err, status) => {
           if (err) {
             return;
@@ -45,7 +45,14 @@ class SocketIO {
           this.sendMessage(MessageType.QUEUE, list);
         });
       }
-      
+      if (name === 'update') {
+        this.mpd.getLibary((err, list) => {
+          if (err) {
+            return;
+          }
+          this.sendMessage(MessageType.LIBARY, list);
+        });
+      }
     });
     this.io = io;
     this.mpd = mpd;
@@ -57,7 +64,7 @@ class SocketIO {
     this.io.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
   sendError(err) {
-    this.sendMessage(MessageType.MPD_OFFLINE, err.message);
+    this.sendMessage(MessageType.MPD_ERROR, err.message);
   }
   serializeMessage(type, data) {
     return JSON.stringify({
@@ -98,11 +105,10 @@ class SocketIO {
             this.sendError(err);
             return;
           }
-          // status -> mixer 没什么用
         });
         break;
-      case MessageType.REPEAT:
-        this.mpd.repeat(data, (err) => {
+      case MessageType.SINGLE:
+        this.mpd.single((err) => {
           if (err) {
             this.sendError(err);
             return;
@@ -110,12 +116,28 @@ class SocketIO {
         });
         break;
       case MessageType.RANDOM:
-        this.mpd.setRandom(data, (err) => {
+        this.mpd.random((err) => {
           if (err) {
             this.sendError(err);
             return;
           }
-          this.sendMessage(MessageType.RANDOM);
+        });
+        break;
+      case MessageType.REPEAT:
+        this.mpd.repeat((err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+        });
+        break;
+      case MessageType.DELETE:
+        this.mpd.delete(data, (err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.OPERATION_SUCCESS);
         });
         break;
       case MessageType.PREVIOUS:
@@ -152,6 +174,15 @@ class SocketIO {
           this.sendMessage(MessageType.QUEUE, list);
         });
         break;
+      case MessageType.REQUEST_CLEAR_QUEUE:
+        this.mpd.clearQueue((err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.OPERATION_SUCCESS);
+        });
+        break;
       case MessageType.REQUEST_ELAPSED:
         this.mpd.getElapsed((err, elapsed) => {
           if (err) {
@@ -169,6 +200,18 @@ class SocketIO {
           }
           this.sendMessage(MessageType.LIBARY, list);
         });
+        break;
+      case MessageType.ADD_TO_QUEUE:
+        this.mpd.addToQueue(data, (err) => {
+          if (err) {
+            this.sendError(err);
+            return;
+          }
+          this.sendMessage(MessageType.OPERATION_SUCCESS);
+        });
+        break;
+      case MessageType.MPD_HEART:
+        this.sendMessage(MessageType.MPD_OFFLINE, this.mpd.status);
         break;
     }
   }

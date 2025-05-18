@@ -3,18 +3,23 @@ import { toInteger } from 'lodash';
 import clsx from 'clsx';
 import Empty from './Empty';
 import Skeleton from './Skeleton';
-import formatTime from '@/lib/format-time';
+
+import { Queue, Libary } from '@/type';
 
 export default function SongList({
   loading = true,
   data = [],
   playId = -1,
+  showIcon = false,
   onSelect,
+  extra,
 }: {
   loading: boolean;
-  data: any;
+  data: Queue[] | Libary[];
+  showIcon?: boolean;
   playId?: number | string;
-  onSelect?: (id?: number | string) => void;
+  onSelect?: (id: string) => void;
+  extra?: any;
 }) {
   if (loading) {
     return <Skeleton />;
@@ -22,34 +27,32 @@ export default function SongList({
   if (data?.length === 0) {
     return <Empty description="空空如也" />;
   }
-  // console.info('SongList', playId, data);
   return (
     <div className="flex flex-col gap-3">
-      {data.map((item: any, index: number) => {
+      {data.map((item, index) => {
         const selected = toInteger(item.id) === toInteger(playId);
         return (
-          <div
-            className="flex gap gap-3 cursor-pointer"
-            key={index}
-            onClick={() => onSelect(item.id)}
-          >
-            <span
-              className={clsx({
-                'material-symbols-outlined': true,
-                '!text-gray-500': selected,
-              })}
-            >
-              play_circle
-            </span>
+          <div className="flex gap gap-3" key={index}>
+            {showIcon && (
+              <span
+                className={clsx({
+                  'material-symbols-outlined cursor-pointer': true,
+                  '!text-gray-500': selected,
+                })}
+                onClick={() => onSelect?.(item?.id)}
+              >
+                play_circle
+              </span>
+            )}
             <div
               className={clsx({
                 'flex-1': true,
                 'text-blue-600': selected,
               })}
             >
-              {item.id} {item.title}
+              {item.id} {item.file}
             </div>
-            <span>{formatTime(item.duration)}</span>
+            {extra && extra(item)}
           </div>
         );
       })}

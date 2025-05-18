@@ -1,30 +1,101 @@
-import { debounce } from 'lodash';
+import clsx from 'clsx';
+import { toInteger } from 'lodash';
 import { useState, useEffect } from 'react';
 import Slider from 'rc-slider';
 import formatTime from '@/lib/format-time';
 
+import { SongInfo } from '@/type';
+
 import 'rc-slider/assets/index.css';
 
-type PlayerType = {
+enum LoopStatus {
+  SINGLE = 'SINGLE',
+  REPEAT = 'REPEAT',
+  RANDOM = 'RANDOM',
+}
+type PlayerPropsType = {
   loading: boolean;
-  data: any;
+  data: SongInfo | null;
   onPlay: () => void;
   onPause: () => void;
-  onVolumn: (nextValue: number) => void;
+  onVolumn: (value: number) => void;
   onNext: () => void;
   onPrevious: () => void;
+  onLoopStatus: (status: LoopStatus) => void;
 };
+
 export enum PlayStatus {
-  UNKONWN = 'UNKONWN',
+  UNKONWN = 'unkonwn',
   PLAY = 'play',
   STOP = 'stop',
   PAUSE = 'pause',
 }
+
 const BtnPlay = ({ status }: { status: PlayStatus }) => {
   if (status === PlayStatus.PLAY || status === PlayStatus.UNKONWN) {
     return 'pause';
   }
   return 'play_circle';
+};
+
+const BtnLoop = ({
+  data,
+  onChange,
+}: {
+  data: SongInfo | null;
+  onChange: (state: LoopStatus) => void;
+}) => {
+  const [currentStatus, setCurrentStatus] = useState(LoopStatus.REPEAT);
+
+  useEffect(() => {
+    if (!data) {
+      return;
+    }
+    const { random, repeat, single } = data;
+    const combinedType = toInteger(`${repeat}${random}${single}`);
+    let loopStatus = null;
+    switch (combinedType) {
+      case 110:
+        loopStatus = LoopStatus.RANDOM;
+        break;
+      case 101:
+        loopStatus = LoopStatus.SINGLE;
+        break;
+      default:
+        loopStatus = LoopStatus.REPEAT;
+        break;
+    }
+    setCurrentStatus(loopStatus);
+  }, [data]);
+  // 1. 循环
+  // 2. 随机
+  // 3. 单曲循环
+  const handleChange = () => {
+    let nextStatus = null;
+    if (currentStatus === LoopStatus.REPEAT) {
+      // 下一个是 2
+      nextStatus = LoopStatus.RANDOM;
+    } else if (currentStatus === LoopStatus.RANDOM) {
+      // 下一个是 3
+      nextStatus = LoopStatus.SINGLE;
+    } else {
+      nextStatus = LoopStatus.REPEAT;
+    }
+    setCurrentStatus(nextStatus);
+    onChange?.(nextStatus);
+  };
+
+  return (
+    <span className="material-symbols-outlined cursor-pointer" onClick={handleChange}>
+      {currentStatus === LoopStatus.REPEAT ? (
+        <>repeat</>
+      ) : currentStatus === LoopStatus.RANDOM ? (
+        <>shuffle</>
+      ) : (
+        <>repeat_one</>
+      )}
+    </span>
+  );
 };
 
 export default function Player({
@@ -35,35 +106,58 @@ export default function Player({
   onVolumn,
   onPrevious,
   onNext,
-}: PlayerType) {
-  // console.info('Player', loading, data);
+  onLoopStatus,
+}: PlayerPropsType) {
   const [btnPlayStatus, setBtnPlayStatus] = useState(PlayStatus.UNKONWN);
-  const [songInfo, setSongInfo] = useState(null);
+  const [songInfo, setSongInfo] = useState<SongInfo | null>(null);
   const [volume, setVolume] = useState(0);
 
   useEffect(() => {
     if (data) {
-      setBtnPlayStatus(data.state);
+      setBtnPlayStatus(data.state as PlayStatus);
       const songInfo = {
         ...data,
         elapsedLabel: formatTime(data.elapsed || 0),
         durationLabel: formatTime(data.duration || 0),
       };
-      setVolume(parseInt(songInfo?.volume || 0, 10));
+      setVolume(toInteger(songInfo?.volume || '0'));
       setSongInfo(songInfo);
     }
   }, [data]);
 
-  const handleVolumeChange = debounce((nextValue) => {
-    onVolumn?.(nextValue);
-  }, 300);
+  useEffect(() => {
+    const debounceVolumeChange = setTimeout(() => {
+      if (volume === 0) {
+        return;
+      }
+      // if (volume === toInteger(songInfo?.volume)) {
+      //   return;
+      // }
+      onVolumn?.(volume);
+    }, 1500);
+    return () => clearTimeout(debounceVolumeChange);
+  }, [volume]);
+
+  const handleVolumeChange = (nextValue: number | number[]) => {
+    setVolume(nextValue as number);
+  };
 
   const handlePrevious = () => {
+    if (!songInfo || !songInfo.id) {
+      return;
+    }
     onPrevious?.();
   };
 
   const handleNext = () => {
+    if (!songInfo || !songInfo.id) {
+      return;
+    }
     onNext?.();
+  };
+
+  const handleLoopStatus = (state: LoopStatus) => {
+    onLoopStatus(state);
   };
 
   const handlePlayOrPause = () => {
@@ -82,15 +176,21 @@ export default function Player({
   return (
     <div className="flex flex-col gap-2 mb-3">
       <div className="flex">
-        <h1 className="text-lg font-medium">{songInfo?.title || '--'}</h1>
-        {/* <div className="rounded-md bg-white w-10 h-10"></div>
+        <div className="rounded-md w-12 h-12 bg-white">
+          <img
+            className={clsx({
+              'animate-spin': btnPlayStatus === PlayStatus.PLAY,
+            })}
+            src="/record.png"
+          />
+        </div>
         <div className="ml-2">
-          
-        </div> */}
+          <h1 className="text-lg font-medium">{songInfo?.file || '--'}</h1>
+        </div>
       </div>
       <div className="flex justify-between text-xs gap gap-3">
         <span>{songInfo?.elapsedLabel}</span>
-        <Slider value={songInfo?.elapsed} max={Number(songInfo?.duration)} />
+        <Slider value={Number(songInfo?.elapsed)} max={Number(songInfo?.duration)} />
         <span>{songInfo?.durationLabel}</span>
       </div>
       <div className="flex justify-center items-center gap gap-3">
@@ -109,11 +209,9 @@ export default function Player({
       </div>
       <div className="flex gap gap-2 items-center">
         <span className="material-symbols-outlined">volume_mute</span>
-        <Slider min={0} max={100} onChange={(nextValue) => {
-          setVolume(nextValue as number);
-          handleVolumeChange(nextValue)
-        }} value={volume} />
+        <Slider step={1} min={0} max={100} onChange={handleVolumeChange} value={volume} />
         <span className="material-symbols-outlined">volume_up</span>
+        <BtnLoop data={songInfo} onChange={handleLoopStatus} />
       </div>
     </div>
   );
