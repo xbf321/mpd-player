@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "DEBUG=player:* nodemon",
-    "build": "next build",
-    "start": "next start",
+    "build": "next build && tsc --project tsconfig.server.json",
+    "start": "node dist/server.js",
     "lint": "next lint"
   },
   "dependencies": {

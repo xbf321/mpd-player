@@ -21,7 +21,14 @@ class SocketIO {
   mpd = null;
   socket = null;
   constructor(httpServer, mpd) {
-    const io = new Server(httpServer);
+    const io = new Server(httpServer, {
+      // path: '/ws',
+      addTrailingSlash: false,
+      cors: {
+        origin: '*',
+        methods: ['GET', 'POST'],
+      },
+    });
     io.on('connection', (socket) => {
       this.socket = socket;
       debug('scoketServer -> connection');

@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import Image from 'next/image';
 import { toInteger } from 'lodash';
 import { useState, useEffect, useRef } from 'react';
 import Slider from 'rc-slider';
@@ -188,11 +189,14 @@ export default function Player({
     <div className="flex flex-col gap-2 mb-3 p-3 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
       <div className="flex !mb-1">
         <div className="rounded-md w-12 h-12 bg-white">
-          <img
+          <Image
             className={clsx({
               'animate-spin': btnPlayStatus === PlayStatus.PLAY,
             })}
             src="/record.png"
+            width={48}
+            height={48}
+            alt="record"
           />
         </div>
         <div className="ml-2">

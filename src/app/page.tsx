@@ -8,7 +8,7 @@ import Stepper, { StepperStatus } from '@/components/Stepper';
 import Player, { PlayStatus } from '@/components/Player';
 
 import { MessageType, MPDStatus } from '@/lib/constant';
-import { socket } from '@/lib/socket-client';
+import { socket } from '@/socket';
 import useInterval from '@/hooks/useInterval';
 
 import { SongInfo, Queue, Library } from '@/type';

@@ -1,3 +1,4 @@
+// https://socket.io/how-to/use-with-nextjs
 import next from 'next';
 import { createServer } from 'http';
 import { loadEnvConfig } from '@next/env';
@@ -10,12 +11,12 @@ if (dev) {
   loadEnvConfig(process.cwd());
 }
 
-const hostname = process.env.HOST_NAME || '0.0.0.0';
+const hostname = process.env.HOSTNAME || '0.0.0.0';
 const port = parseInt(process.env.PORT || '7180', 10);
 const MPD_HOST = process.env.MPD_HOST || '0.0.0.0';
 const MPD_PORT = Number(process.env.MPD_PORT) || 6660;
 
-const app = next({ dev });
+const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
 app.prepare().then(() => {

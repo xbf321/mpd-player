@@ -27,18 +27,23 @@ version: '3.9'
       container_name: mpd-player
       restart: unless-stopped
       ports:
-        - 7180:7180
+        - 7170:7170
       environment:
-        # 登录用户名和密码默认都是 test
-        - AUTH_USER_NAME=test
-        - AUTH_USER_PASSWORD=test
-        - MESSAGE_PUSHER_SERVER_TOKEN=token
-        # CloudConvert 访问 token ，用于把 word 格式转换为 pdf 格式
-        - CLOUDCONVERT_ACCESS_TOKEN=token
+        - MPD_HOST=192.168.100.1
+        - MPD_PORT=7160
 ```
 
 
 ## 开发
+
+修改 .env 文件，仅在 development 环境生效
+
+```sh
+HOST_NAME=0.0.0.0
+PORT=7170
+MPD_HOST=10.147.20.1
+MPD_PORT=7160
+```
 
 First, run the development server:
 
@@ -48,9 +53,11 @@ pnpm run dev
 
 推荐使用 PNPM。
 
-Open [http://localhost:7180](http://localhost:7180) with your browser to see the result.
+Open [http://localhost:7170](http://localhost:7170) with your browser to see the result.
 
 ## WS Command
+
+参见 **/src/lib/sockt-server.ts**
 
 ```js
 { "type": "PLAY"}
@@ -62,26 +69,23 @@ Open [http://localhost:7180](http://localhost:7180) with your browser to see the
 { "type": "REPEAT","data": true}
 { "type": "RANDOM","data": true}
 { "type": "QUEUE"}
-playlistinfo
-
-
+...
 ```
 
-## 参考
+## Docker 操作
 
-https://github.com/ondras/cyp/blob/master/app/js/mpd.ts
+```shell
+# 构建 image
+docker build -t xbf321/mpd-player .
 
-## Learn More
+# 发布到 hub.docker.io
+docker push xbf321/mpd-player:latest
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 创建容器
+# 后台运行
+docker run -d -p 7170:7170 -e MPD_HOST=192.168.100.1 -e MPD_PORT=7160 --name mpd-player xbf321/mpd-player:latest
+# 临时运行
+docker run -it --name mpd-player xbf321/mpd-player /bin/bash
+# 进入容器内部
+docker exec -it mpd-player /bin/bash
+```

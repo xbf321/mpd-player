@@ -32,7 +32,10 @@ export default function SongList({
       {data.map((item, index) => {
         const selected = toInteger(item.id) === toInteger(playId);
         return (
-          <div className="flex gap gap-3 border-b border-gray-200 pb-2" key={index}>
+          <div className={clsx({
+            'flex gap gap-3 pb-2': true,
+            'border-b border-gray-200': index !== data.length -1 
+          })} key={index}>
             {showIcon && (
               <span
                 className={clsx({
