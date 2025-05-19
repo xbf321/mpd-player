@@ -11,7 +11,7 @@ import { MessageType, MPDStatus } from '@/lib/constant';
 import { socket } from '@/lib/socket-client';
 import useInterval from '@/hooks/useInterval';
 
-import { SongInfo, Queue, Libary } from '@/type';
+import { SongInfo, Queue, Library } from '@/type';
 
 
 enum TabType {
@@ -35,7 +35,7 @@ export default function Home() {
     loading: true,
     data: [],
   });
-  const [libray, setLibray] = useState<{ loading: boolean; data: Libary[] }>({
+  const [libray, setLibray] = useState<{ loading: boolean; data: Library[] }>({
     loading: true,
     data: [],
   });
@@ -79,7 +79,7 @@ export default function Home() {
       socket.on(MessageType.MESSAGE_EVENT, receiveMessage);
       sendMessage(MessageType.REQUEST_STATUS);
       sendMessage(MessageType.REQUEST_QUEUE);
-      sendMessage(MessageType.REQUEST_LIBARY);
+      sendMessage(MessageType.REQUEST_LIBRARY);
       sendMessage(MessageType.MPD_HEART);
     };
 
@@ -115,7 +115,6 @@ export default function Home() {
   };
 
   const receiveMessage = (msg: string) => {
-    console.info('receiveMessage', msg);
     const { type, payload: data } = JSON.parse(msg);
     switch (type) {
       case MessageType.STATUS:
@@ -151,7 +150,7 @@ export default function Home() {
           data,
         });
         break;
-      case MessageType.LIBARY:
+      case MessageType.LIBRARY:
         setLibray({
           loading: false,
           data,
@@ -216,7 +215,7 @@ export default function Home() {
     sendMessage(MessageType.REQUEST_CLEAR_QUEUE);
   };
 
-  const handleAddToQueue = (item: Libary) => {
+  const handleAddToQueue = (item: Library) => {
     sendMessage(MessageType.ADD_TO_QUEUE, item.file);
   };
 
@@ -238,8 +237,8 @@ export default function Home() {
           <li className="me-2" onClick={() => handleTabChange(0)}>
             <a
               className={clsx({
-                'inline-block p-2 border-b-2 border-transparent rounded-t-lg cursor-pointer': true,
-                'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300':
+                'inline-block p-2 border-b-2 rounded-t-lg cursor-pointer': true,
+                'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300':
                   selectedTab !== 0,
                 'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500':
                   selectedTab === 0,
@@ -251,8 +250,8 @@ export default function Home() {
           <li className="me-2" onClick={() => handleTabChange(1)}>
             <a
               className={clsx({
-                'inline-block p-2 border-b-2 border-transparent rounded-t-lg cursor-pointer': true,
-                'hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300':
+                'inline-block p-2 border-b-2 rounded-t-lg cursor-pointer': true,
+                'hover:text-gray-600 hover:border-gray-300 border-transparent dark:hover:text-gray-300':
                   selectedTab !== 1,
                 'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500':
                   selectedTab === 1,
@@ -297,7 +296,7 @@ export default function Home() {
             showIcon={false}
             loading={queue.loading}
             data={libray.data}
-            extra={(item: Libary) => (
+            extra={(item: Library) => (
               <>
                 <span
                   className="material-symbols-outlined cursor-pointer"

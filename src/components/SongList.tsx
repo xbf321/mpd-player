@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import Empty from './Empty';
 import Skeleton from './Skeleton';
 
-import { Queue, Libary } from '@/type';
+import { Queue, Library } from '@/type';
 
 export default function SongList({
   loading = true,
@@ -15,7 +15,7 @@ export default function SongList({
   extra,
 }: {
   loading: boolean;
-  data: Queue[] | Libary[];
+  data: Queue[] | Library[];
   showIcon?: boolean;
   playId?: number | string;
   onSelect?: (id: string) => void;
@@ -32,7 +32,7 @@ export default function SongList({
       {data.map((item, index) => {
         const selected = toInteger(item.id) === toInteger(playId);
         return (
-          <div className="flex gap gap-3" key={index}>
+          <div className="flex gap gap-3 border-b border-gray-200 pb-2" key={index}>
             {showIcon && (
               <span
                 className={clsx({

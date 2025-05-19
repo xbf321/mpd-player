@@ -19,4 +19,4 @@ export interface SongInfo extends Status {
 
 export type Queue = Pick<SongInfo, 'id' | 'duration' | 'durationLabel' | 'file'>;
 
-export type Libary = Pick<SongInfo, 'id' | 'file'>;
+export type Library = Pick<SongInfo, 'id' | 'file'>;

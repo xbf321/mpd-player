@@ -54,9 +54,10 @@ class MDPClient {
     });
   }
   // done -> non result
-  play(id: string, callback: CallbackFn) {
+  play(id: string | null, callback: CallbackFn) {
     const arg = id ? [id] : [];
     this._sendCommands(cmd('playid', arg), (err) => {
+      debug('play', arg, err);
       if (err) {
         return callback(err);
       }
@@ -191,7 +192,7 @@ class MDPClient {
     });
   }
   // done
-  getLibary(callback: CallbackFn) {
+  getLibrary(callback: CallbackFn) {
     this._sendCommands(cmd('listall', []), (err, msg) => {
       if (err) {
         return callback(err);

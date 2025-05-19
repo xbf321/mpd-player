@@ -4,7 +4,6 @@ import { loadEnvConfig } from '@next/env';
 
 import MDPClient from './lib/mpd-client';
 import SocketServer from './lib/socket-server';
-
 const dev = process.env.NODE_ENV !== 'production';
 if (dev) {
   // DEV 环境使用 .env 调试
@@ -20,8 +19,13 @@ const app = next({ dev });
 const handler = app.getRequestHandler();
 
 app.prepare().then(() => {
+  const mpdClient = new MDPClient(MPD_HOST as string, MPD_PORT);
   const httpServer = createServer(handler);
-  new SocketServer(httpServer, new MDPClient(MPD_HOST as string, MPD_PORT));
+  new SocketServer(httpServer, mpdClient);
+  // 追加不到 Nextjs 中的 Request 里
+  // 迂回一下，放到 process 中，便于在 /api/ 中访问
+  // @ts-ignore
+  process.mpdClient = mpdClient;
 
   httpServer
     .once('error', (err) => {

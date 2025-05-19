@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { toInteger } from 'lodash';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Slider from 'rc-slider';
 import formatTime from '@/lib/format-time';
 
@@ -14,7 +14,7 @@ enum LoopStatus {
   RANDOM = 'RANDOM',
 }
 type PlayerPropsType = {
-  loading: boolean;
+  loading?: boolean;
   data: SongInfo | null;
   onPlay: () => void;
   onPause: () => void;
@@ -61,7 +61,13 @@ const BtnLoop = ({
       case 101:
         loopStatus = LoopStatus.SINGLE;
         break;
+      case 100:
+        loopStatus = LoopStatus.REPEAT;
+        break;
       default:
+        // 播放器没有设置过循环模式
+        // 需要更新
+        onChange?.(LoopStatus.REPEAT);
         loopStatus = LoopStatus.REPEAT;
         break;
     }
@@ -99,7 +105,6 @@ const BtnLoop = ({
 };
 
 export default function Player({
-  loading,
   data,
   onPause,
   onPlay,
@@ -111,6 +116,8 @@ export default function Player({
   const [btnPlayStatus, setBtnPlayStatus] = useState(PlayStatus.UNKONWN);
   const [songInfo, setSongInfo] = useState<SongInfo | null>(null);
   const [volume, setVolume] = useState(0);
+  // 只有手动改变过音量，才发送请求
+  const isManuChangeVolume = useRef(false);
 
   useEffect(() => {
     if (data) {
@@ -130,15 +137,19 @@ export default function Player({
       if (volume === 0) {
         return;
       }
-      // if (volume === toInteger(songInfo?.volume)) {
-      //   return;
-      // }
+      if (!isManuChangeVolume.current) {
+        return;
+      }
+      if (volume === toInteger(songInfo?.volume)) {
+        return;
+      }
       onVolumn?.(volume);
     }, 1500);
     return () => clearTimeout(debounceVolumeChange);
   }, [volume]);
 
   const handleVolumeChange = (nextValue: number | number[]) => {
+    isManuChangeVolume.current = true;
     setVolume(nextValue as number);
   };
 
@@ -174,8 +185,8 @@ export default function Player({
   };
 
   return (
-    <div className="flex flex-col gap-2 mb-3">
-      <div className="flex">
+    <div className="flex flex-col gap-2 mb-3 p-3 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+      <div className="flex !mb-1">
         <div className="rounded-md w-12 h-12 bg-white">
           <img
             className={clsx({

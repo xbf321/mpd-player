@@ -46,11 +46,11 @@ class SocketIO {
         });
       }
       if (name === 'update') {
-        this.mpd.getLibary((err, list) => {
+        this.mpd.getLibrary((err, list) => {
           if (err) {
             return;
           }
-          this.sendMessage(MessageType.LIBARY, list);
+          this.sendMessage(MessageType.LIBRARY, list);
         });
       }
     });
@@ -80,8 +80,8 @@ class SocketIO {
     this.socket.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
   recieveMessage(msg) {
+    debug('Received %s', msg);
     const { type, payload: data } = JSON.parse(msg);
-    debug('Received %s with %o', type, data);
     switch (type) {
       case MessageType.PLAY:
         this.mpd.play(data, (err) => {
@@ -192,13 +192,13 @@ class SocketIO {
           this.sendMessage(MessageType.ELAPSED, elapsed);
         });
         break;
-      case MessageType.REQUEST_LIBARY:
-        this.mpd.getLibary((err, list) => {
+      case MessageType.REQUEST_LIBRARY:
+        this.mpd.getLibrary((err, list) => {
           if (err) {
             this.sendError(err);
             return;
           }
-          this.sendMessage(MessageType.LIBARY, list);
+          this.sendMessage(MessageType.LIBRARY, list);
         });
         break;
       case MessageType.ADD_TO_QUEUE:

@@ -1,24 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+这是一款基于 MPD 的客户端播放器，使用 Nextjs 开发，支持：
 
-## Getting Started
+* 播放/暂停
+* 下一首/上一首
+* 更改音量
+* 更改播放模式
+* 清空播放队列
+* 从 Database 中添加歌曲
+
+![界面](./public/screen-1.jpg)
+
+## 什么是 MPD
+
+MPD 是 [Music Player Daemon](https://www.musicpd.org/) 缩写。
+
+Music Player Daemon (MPD) is a flexible, powerful, server-side application for playing music. Through plugins and libraries it can play a variety of sound files while being controlled by its network protocol.
+
+## 部署
+
+请使用 Docker 部署
+
+```sh
+version: '3.9'
+  services:
+    mpd-player:
+      image: xbf321/mpd-player:latest
+      container_name: mpd-player
+      restart: unless-stopped
+      ports:
+        - 7180:7180
+      environment:
+        # 登录用户名和密码默认都是 test
+        - AUTH_USER_NAME=test
+        - AUTH_USER_PASSWORD=test
+        - MESSAGE_PUSHER_SERVER_TOKEN=token
+        # CloudConvert 访问 token ，用于把 word 格式转换为 pdf 格式
+        - CLOUDCONVERT_ACCESS_TOKEN=token
+```
+
+
+## 开发
 
 First, run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+推荐使用 PNPM。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:7180](http://localhost:7180) with your browser to see the result.
 
 ## WS Command
 

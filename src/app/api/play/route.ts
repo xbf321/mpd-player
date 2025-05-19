@@ -1,11 +1,24 @@
-import { headers } from 'next/headers'
- 
-export async function GET(request: Request, response: Response) {
-  const headersList = await headers()
-  const referer = headersList.get('referer')
-  console.info('play-api', request);
-  return new Response('Hello, Next2wwww.js!', {
+// @ts-nocheck
+export async function GET() {
+  const mpd = process.mpdClient;
+  if (!mpd) {
+    return new Response('MPD is not exist.', {
+      status: 200,
+    });
+  }
+  const wrapPromise = () => {
+    return new Promise((resolve, reject) => {
+      mpd.play(null, (err: Error) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+  };
+  const data = await wrapPromise();
+  return new Response(data ? data : 'Operate success.', {
     status: 200,
-    headers: { referer: referer },
   })
 }
