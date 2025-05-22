@@ -4,7 +4,6 @@ const debug = require('debug')('player:mpd-client');
 
 import formatTime from './format-time';
 import { MPDStatus } from './constant';
-import { Queue } from '../type';
 import { isEmpty } from 'lodash';
 
 type CallbackFn = (err?: Error | string | null | unknown, msg?: any) => void;
@@ -160,7 +159,7 @@ class MDPClient {
       if (err) {
         return callback(err);
       }
-      const list: Queue[] = this._transformList(msg);
+      const list: any[] = this._transformList(msg);
       callback(null, list);
     });
   }
@@ -183,6 +182,7 @@ class MDPClient {
   }
   // done
   getStatus(callback: CallbackFn) {
+    // , cmd('status', [])
     this._sendCommands([cmd('currentsong', []), cmd('status', [])], (err, msg) => {
       if (err) {
         return callback(err);
@@ -207,7 +207,7 @@ class MDPClient {
       // debug('_sendCommands', commands);
       if (this.status !== MPDStatus.READY) callback('Not connected');
       const cb = (err: Error | null, msg: string) => {
-        // debug('_sendCommands -> result', err, msg);
+        // debug('_sendCommands -> result', commands, err, msg);
         if (err) {
           debug(err);
           callback(err);
@@ -238,7 +238,7 @@ class MDPClient {
         return formatedValue;
       })
       .filter((item: any) => item !== null)
-      .map((item: Queue) => {
+      .map((item: any) => {
         const { id, duration, file } = item;
         return {
           id,

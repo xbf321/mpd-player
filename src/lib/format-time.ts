@@ -1,4 +1,4 @@
-export default function formatTime(sec: number | string) {
+export default function formatTime(sec: number | string | undefined | null) {
 	if (!sec) {
 		return '';
 	}

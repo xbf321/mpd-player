@@ -1,11 +1,9 @@
 import clsx from 'clsx';
 import Image from 'next/image';
 import { toInteger } from 'lodash';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Slider from 'rc-slider';
 import formatTime from '@/lib/format-time';
-
-import { SongInfo } from '@/type';
 
 import 'rc-slider/assets/index.css';
 
@@ -14,6 +12,7 @@ enum LoopStatus {
   REPEAT = 'REPEAT',
   RANDOM = 'RANDOM',
 }
+
 type PlayerPropsType = {
   loading?: boolean;
   data: SongInfo | null;
@@ -32,15 +31,8 @@ export enum PlayStatus {
   PAUSE = 'pause',
 }
 
-const BtnPlay = ({ status }: { status: PlayStatus }) => {
-  if (status === PlayStatus.PLAY || status === PlayStatus.UNKONWN) {
-    return 'pause';
-  }
-  return 'play_circle';
-};
-
 const BtnLoop = ({
-  data,
+  data: songInfo,
   onChange,
 }: {
   data: SongInfo | null;
@@ -49,12 +41,12 @@ const BtnLoop = ({
   const [currentStatus, setCurrentStatus] = useState(LoopStatus.REPEAT);
 
   useEffect(() => {
-    if (!data) {
+    if (!songInfo) {
       return;
     }
-    const { random, repeat, single } = data;
+    const { random, repeat, single } = songInfo;
     const combinedType = toInteger(`${repeat}${random}${single}`);
-    let loopStatus = null;
+    let loopStatus = LoopStatus.REPEAT;
     switch (combinedType) {
       case 110:
         loopStatus = LoopStatus.RANDOM;
@@ -69,23 +61,23 @@ const BtnLoop = ({
         // 播放器没有设置过循环模式
         // 需要更新
         onChange?.(LoopStatus.REPEAT);
-        loopStatus = LoopStatus.REPEAT;
         break;
     }
     setCurrentStatus(loopStatus);
-  }, [data]);
+  }, [songInfo]);
+
   // 1. 循环
   // 2. 随机
   // 3. 单曲循环
   const handleChange = () => {
-    let nextStatus = null;
+    let nextStatus = LoopStatus.REPEAT;
     if (currentStatus === LoopStatus.REPEAT) {
       // 下一个是 2
       nextStatus = LoopStatus.RANDOM;
     } else if (currentStatus === LoopStatus.RANDOM) {
       // 下一个是 3
       nextStatus = LoopStatus.SINGLE;
-    } else {
+    } else if (currentStatus === LoopStatus.SINGLE) {
       nextStatus = LoopStatus.REPEAT;
     }
     setCurrentStatus(nextStatus);
@@ -106,7 +98,7 @@ const BtnLoop = ({
 };
 
 export default function Player({
-  data,
+  data: songInfo,
   onPause,
   onPlay,
   onVolumn,
@@ -114,46 +106,44 @@ export default function Player({
   onNext,
   onLoopStatus,
 }: PlayerPropsType) {
-  const [btnPlayStatus, setBtnPlayStatus] = useState(PlayStatus.UNKONWN);
-  const [songInfo, setSongInfo] = useState<SongInfo | null>(null);
-  const [volume, setVolume] = useState(0);
-  // 只有手动改变过音量，才发送请求
-  const isManuChangeVolume = useRef(false);
+  const [volume, setVolume] = useState(songInfo?.volume || 0);
+  const [btnPlayStatus, setBtnPlayStatus] = useState(songInfo?.state);
 
+  // done
   useEffect(() => {
-    if (data) {
-      setBtnPlayStatus(data.state as PlayStatus);
-      const songInfo = {
-        ...data,
-        elapsedLabel: formatTime(data.elapsed || 0),
-        durationLabel: formatTime(data.duration || 0),
-      };
-      setVolume(toInteger(songInfo?.volume || '0'));
-      setSongInfo(songInfo);
+    if (toInteger(songInfo?.volume || 0)) {
+      setVolume(toInteger(songInfo?.volume || 0));
     }
-  }, [data]);
+  }, [songInfo?.volume]);
 
+  // done
+  useEffect(() => {
+    if (!songInfo) {
+      return;
+    }
+    setBtnPlayStatus(songInfo.state as PlayStatus);
+  }, [songInfo?.state]);
+
+  // done
   useEffect(() => {
     const debounceVolumeChange = setTimeout(() => {
       if (volume === 0) {
         return;
       }
-      if (!isManuChangeVolume.current) {
-        return;
-      }
       if (volume === toInteger(songInfo?.volume)) {
         return;
       }
-      onVolumn?.(volume);
+      onVolumn?.(toInteger(volume));
     }, 1500);
     return () => clearTimeout(debounceVolumeChange);
   }, [volume]);
 
+  // done
   const handleVolumeChange = (nextValue: number | number[]) => {
-    isManuChangeVolume.current = true;
     setVolume(nextValue as number);
   };
 
+  // done
   const handlePrevious = () => {
     if (!songInfo || !songInfo.id) {
       return;
@@ -161,6 +151,7 @@ export default function Player({
     onPrevious?.();
   };
 
+  // done
   const handleNext = () => {
     if (!songInfo || !songInfo.id) {
       return;
@@ -168,10 +159,12 @@ export default function Player({
     onNext?.();
   };
 
+  // done
   const handleLoopStatus = (state: LoopStatus) => {
     onLoopStatus(state);
   };
 
+  // done
   const handlePlayOrPause = () => {
     if (!songInfo || !songInfo.id) {
       return;
@@ -204,9 +197,9 @@ export default function Player({
         </div>
       </div>
       <div className="flex justify-between text-xs gap gap-3">
-        <span>{songInfo?.elapsedLabel}</span>
+        <span>{formatTime(songInfo?.elapsed)}</span>
         <Slider value={Number(songInfo?.elapsed)} max={Number(songInfo?.duration)} />
-        <span>{songInfo?.durationLabel}</span>
+        <span>{formatTime(songInfo?.duration)}</span>
       </div>
       <div className="flex justify-center items-center gap gap-3">
         <span className="material-symbols-outlined cursor-pointer" onClick={handlePrevious}>
@@ -216,7 +209,9 @@ export default function Player({
           className="material-symbols-outlined !text-4xl cursor-pointer"
           onClick={handlePlayOrPause}
         >
-          <BtnPlay status={btnPlayStatus} />
+          {songInfo?.state === PlayStatus.PLAY || songInfo?.state === PlayStatus.UNKONWN
+            ? 'pause'
+            : 'play_circle'}
         </span>
         <span className="material-symbols-outlined cursor-pointer" onClick={handleNext}>
           skip_next
@@ -224,7 +219,7 @@ export default function Player({
       </div>
       <div className="flex gap gap-2 items-center">
         <span className="material-symbols-outlined">volume_mute</span>
-        <Slider step={1} min={0} max={100} onChange={handleVolumeChange} value={volume} />
+        <Slider step={1} min={0} max={100} onChange={handleVolumeChange} value={Number(volume)} />
         <span className="material-symbols-outlined">volume_up</span>
         <BtnLoop data={songInfo} onChange={handleLoopStatus} />
       </div>

@@ -4,7 +4,6 @@ import clsx from 'clsx';
 import Empty from './Empty';
 import Skeleton from './Skeleton';
 
-import { Queue, Library } from '@/type';
 
 export default function SongList({
   loading = true,

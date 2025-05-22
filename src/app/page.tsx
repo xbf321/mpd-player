@@ -1,18 +1,17 @@
 'use client';
 import clsx from 'clsx';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 
 import SongList from '@/components/SongList';
 import Stepper, { StepperStatus } from '@/components/Stepper';
 import Player, { PlayStatus } from '@/components/Player';
 
-import { MessageType, MPDStatus } from '@/lib/constant';
 import { socket } from '@/socket';
 import useInterval from '@/hooks/useInterval';
+import { MessageType, MPDStatus } from '@/lib/constant';
 
-import { SongInfo, Queue, Library } from '@/type';
-
+import StatusContext from './context';
 
 enum TabType {
   Queue = 0,
@@ -20,56 +19,54 @@ enum TabType {
 }
 
 export default function Home() {
+  // done
+  const [songInfo, setSongInfo] = useContext(StatusContext);
+  // done
   const [selectedTab, setSelectedTab] = useState(TabType.Queue);
   const [stepperInfo, setStepperInfo] = useState({
     socketReady: false,
     mpdReady: false,
     current: 0,
   });
+  // done
   const [currentPlaySongId, setCurrentPlaySongId] = useState(-1);
-  const [songInfo, setSongInfo] = useState<{ loading: boolean; data: SongInfo | null }>({
-    loading: true,
-    data: null,
-  });
+  // done
   const [queue, setQueue] = useState<{ loading: boolean; data: Queue[] }>({
     loading: true,
     data: [],
   });
+  // done
   const [libray, setLibray] = useState<{ loading: boolean; data: Library[] }>({
     loading: true,
     data: [],
   });
 
+  // done
   const stepItems = [
     {
       title: stepperInfo.socketReady ? 'Network Connected' : 'Checking Network...',
       status: stepperInfo.socketReady ? StepperStatus.DONE : StepperStatus.CHECKING,
     },
-    {
-      title: stepperInfo.socketReady
-        ? stepperInfo.mpdReady
-          ? 'MPD has been ready'
-          : 'Checking MPD...'
-        : 'Waiting',
-      status: stepperInfo.mpdReady ? StepperStatus.DONE : StepperStatus.CHECKING,
-    },
   ];
 
+  // done
   useInterval(() => {
-    if (!songInfo.data) {
+    if (!songInfo) {
       return;
     }
-    const { state } = songInfo.data;
+    const { state } = songInfo;
     if (state !== PlayStatus.PLAY) {
       return;
     }
-    sendMessage(MessageType.REQUEST_ELAPSED);
-  }, 900);
+    sendMessage(MessageType.REQUEST_STATUS);
+  }, 1000);
 
+  // done
   useInterval(() => {
     sendMessage(MessageType.MPD_HEART);
-  }, 5000);
+  }, 10000);
 
+  // done
   useEffect(() => {
     const onConnect = () => {
       setStepperInfo({
@@ -80,7 +77,6 @@ export default function Home() {
       sendMessage(MessageType.REQUEST_STATUS);
       sendMessage(MessageType.REQUEST_QUEUE);
       sendMessage(MessageType.REQUEST_LIBRARY);
-      sendMessage(MessageType.MPD_HEART);
     };
 
     const onDisconnect = () => {
@@ -103,6 +99,7 @@ export default function Home() {
     };
   }, []);
 
+  // done
   const sendMessage = (type = '', data: number | string | null = null) => {
     const msg = {
       type: type,
@@ -116,31 +113,16 @@ export default function Home() {
 
   const receiveMessage = (msg: string) => {
     const { type, payload: data } = JSON.parse(msg);
+    console.info('receiveMessage', type, data);
     switch (type) {
       case MessageType.STATUS:
         {
-          const updatedSong = {
-            loading: false,
-            data: {
-              ...data,
-            },
+          const updateSongInfo = {
+            ...songInfo,
+            ...data,
           };
-          setSongInfo(updatedSong);
+          setSongInfo(updateSongInfo);
           setCurrentPlaySongId(data?.id || -1);
-        }
-        break;
-      case MessageType.ELAPSED:
-        {
-          // @ts-ignore
-          setSongInfo(({ loading, data: songInfo }) => {
-            return {
-              loading,
-              data: {
-                ...songInfo,
-                elapsed: data,
-              },
-            };
-          });
         }
         break;
       case MessageType.QUEUE:
@@ -160,11 +142,10 @@ export default function Home() {
         toast.error(data);
         break;
       case MessageType.MPD_OFFLINE:
-        setStepperInfo({
-          socketReady: true,
-          mpdReady: Number(data) === MPDStatus.READY,
-          current: 1,
-        });
+        if (Number(data) === MPDStatus.READY) {
+          return;
+        }
+        toast.error('MPD Server has been offline. Please refresh page.');
         break;
       case MessageType.OPERATION_SUCCESS:
         toast.success('Success');
@@ -172,7 +153,11 @@ export default function Home() {
     }
   };
 
-  const handlePlayback = (type: MessageType = MessageType.MESSAGE_EVENT, data: string | number | null = null) => {
+  // done
+  const handlePlayback = (
+    type: MessageType = MessageType.MESSAGE_EVENT,
+    data: string | number | null = null,
+  ) => {
     switch (type) {
       case MessageType.PLAY:
         sendMessage(MessageType.PLAY, data);
@@ -204,10 +189,12 @@ export default function Home() {
     }
   };
 
+  // done
   const handleTabChange = (value: number) => {
     setSelectedTab(value);
   };
 
+  // done
   const handleClearQueue = () => {
     if (queue.data?.length === 0) {
       return;
@@ -215,16 +202,22 @@ export default function Home() {
     sendMessage(MessageType.REQUEST_CLEAR_QUEUE);
   };
 
+  // done
   const handleAddToQueue = (item: Library) => {
     sendMessage(MessageType.ADD_TO_QUEUE, item.file);
   };
 
   return (
     <>
-      <Stepper current={stepperInfo.current} items={stepItems} />
+      <Stepper
+        current={stepperInfo.current}
+        items={stepItems}
+        className={clsx({
+          hidden: stepperInfo.socketReady,
+        })}
+      />
       <Player
-        loading={songInfo.loading}
-        data={songInfo.data}
+        data={songInfo}
         onPlay={() => handlePlayback(MessageType.PLAY)}
         onPause={() => handlePlayback(MessageType.PAUSE)}
         onNext={() => handlePlayback(MessageType.NEXT)}

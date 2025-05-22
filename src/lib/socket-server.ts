@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { Server } from 'socket.io';
 import { MessageType } from './constant';
+
 const debug = require('debug')('player:socket.io');
 const objectToLowerCase = (data) => {
   if (!data) {
@@ -22,7 +23,6 @@ class SocketIO {
   socket = null;
   constructor(httpServer, mpd) {
     const io = new Server(httpServer, {
-      // path: '/ws',
       addTrailingSlash: false,
       cors: {
         origin: '*',
@@ -187,16 +187,6 @@ class SocketIO {
             this.sendError(err);
             return;
           }
-          this.sendMessage(MessageType.OPERATION_SUCCESS);
-        });
-        break;
-      case MessageType.REQUEST_ELAPSED:
-        this.mpd.getElapsed((err, elapsed) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.ELAPSED, elapsed);
         });
         break;
       case MessageType.REQUEST_LIBRARY:

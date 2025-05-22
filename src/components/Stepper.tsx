@@ -13,11 +13,12 @@ export type StepperItemType = {
 export type StepperPropsType = {
   current: number;
   items: StepperItemType[];
+  className?: string;
 };
 
-export default function Stepper({ current, items }: StepperPropsType) {
+export default function Stepper({ current, items, className }: StepperPropsType) {
   return (
-    <ol className="mb-3 flex items-center w-full p-3 space-x-2 text-sm font-medium text-center text-gray-500 bg-white border border-gray-200 rounded-lg shadow-xs dark:text-gray-400 sm:text-base dark:bg-gray-800 dark:border-gray-700 sm:p-4 sm:space-x-4 rtl:space-x-reverse">
+    <ol className={clsx(["mb-3 flex items-center w-full p-3 space-x-2 text-sm font-medium text-center text-gray-500 bg-white border border-gray-200 rounded-lg shadow-xs dark:text-gray-400 sm:text-base dark:bg-gray-800 dark:border-gray-700 sm:p-4 sm:space-x-4 rtl:space-x-reverse", className])}>
       {items.map((item, index) => {
         const rootClassName = clsx({
           'flex items-center': true,
