@@ -21,16 +21,16 @@ Music Player Daemon (MPD) is a flexible, powerful, server-side application for p
 
 ```sh
 version: '3.9'
-  services:
-    mpd-player:
-      image: xbf321/mpd-player:latest
-      container_name: mpd-player
-      restart: unless-stopped
-      ports:
-        - 7170:7170
-      environment:
-        - MPD_HOST=192.168.100.1
-        - MPD_PORT=7160
+services:
+  mpd-player:
+    image: xbf321/mpd-player:latest
+    container_name: mpd-player
+    restart: unless-stopped
+    ports:
+      - 7170:7170
+    environment:
+      - MPD_HOST=192.168.100.1
+      - MPD_PORT=7160
 ```
 
 
