@@ -1,14 +1,72 @@
-const mpd = require('mpd');
-const cmd = mpd.cmd;
-const debug = require('debug')('player:mpd-client');
+import mpd from 'mpd';
+import rawDebug from 'debug';
+import { isEmpty, isPlainObject } from 'lodash';
+import { promisify } from 'node:util';
 
 import formatTime from './format-time';
-import { MPDStatus } from './constant';
-import { isEmpty } from 'lodash';
+import { MPDStatus, MessageType } from './constant';
+
+const loop = () => {};
+const debug = rawDebug('mpd-client');
 
 type CallbackFn = (err?: Error | string | null | unknown, msg?: any) => void;
 
-class MDPClient {
+const EXEC_CMD_MAP: any = {
+  [`${MessageType.REQUEST_PLAY}`]: (id: string) => {
+    const arg = id ? [id] : [];
+    return mpd.cmd('playid', arg);
+  },
+  [`${MessageType.REQUEST_PAUSE}`]: () => {
+    return mpd.cmd('pause', [1]);
+  },
+  [`${MessageType.REQUEST_SINGLE}`]: () => {
+    return [mpd.cmd('single', [1]), mpd.cmd('repeat', [1]), mpd.cmd('random', [0])];
+  },
+  [`${MessageType.REQUEST_RANDOM}`]: () => {
+    return [mpd.cmd('single', [0]), mpd.cmd('repeat', [1]), mpd.cmd('random', [1])];
+  },
+  [`${MessageType.REQUEST_REPEAT}`]: () => {
+    return [mpd.cmd('single', [0]), mpd.cmd('repeat', [1]), mpd.cmd('random', [0])];
+  },
+  [`${MessageType.REQUEST_DELETE}`]: (id: string) => {
+    return mpd.cmd('deleteid', [id]);
+  },
+  [`${MessageType.REQUEST_PREVIOUS}`]: () => {
+    return mpd.cmd('previous', []);
+  },
+  [`${MessageType.REQUEST_NEXT}`]: () => {
+    return mpd.cmd('next', []);
+  },
+  [`${MessageType.REQUEST_STATUS}`]: () => {
+    return {
+      command: [mpd.cmd('currentsong', []), mpd.cmd('status', [])],
+      processFn: MPDClient.__transformSongInfo,
+    };
+  },
+  [`${MessageType.REQUEST_QUEUE}`]: () => {
+    return {
+      command: mpd.cmd('playlistinfo', []),
+      processFn: MPDClient.__transformList,
+    };
+  },
+  [`${MessageType.REQUEST_LIBRARY}`]: () => {
+    return {
+      command: mpd.cmd('listall', []),
+      processFn: MPDClient.__transformList,
+    };
+  },
+  [`${MessageType.REQUEST_CLEAR_QUEUE}`]: () => {
+    return mpd.cmd('clear', []);
+  },
+  [`${MessageType.REQUEST_ADD_TO_QUEUE}`]: (id: string) => {
+    return mpd.cmd('add', [id]);
+  },
+  [`${MessageType.REQUEST_SET_VOL}`]: (value: number) => {
+    return mpd.cmd('setvol', [value]);
+  }
+};
+
+class MPDClient {
   status = MPDStatus.DISCONNECTED;
   host = '';
   port = 0;
@@ -19,6 +77,7 @@ class MDPClient {
     debug('constructor', host, port);
     this.connect();
   }
+
   retryConnect() {
     if (this.status === MPDStatus.RECONNECTION) return;
     this.status = MPDStatus.RECONNECTION;
@@ -26,6 +85,7 @@ class MDPClient {
       this.connect();
     }, 3000);
   }
+
   connect() {
     const client = mpd.connect({
       port: this.port,
@@ -46,184 +106,63 @@ class MDPClient {
       this.retryConnect();
     });
     this.client = client;
+    this.client.promisifiedSendCommand = promisify(this.client.sendCommand);
+    this.client.promisifiedSendCommands = promisify(this.client.sendCommands);
   }
+
   onSystemChange(callback: CallbackFn) {
     this.client.on('system', (name: string) => {
       callback(name);
     });
   }
-  // done -> non result
-  play(id: string | null, callback: CallbackFn) {
-    const arg = id ? [id] : [];
-    this._sendCommands(cmd('playid', arg), (err) => {
-      debug('play', arg, err);
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  pause(callback: CallbackFn) {
-    this._sendCommands(cmd('pause', [1]), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  next(callback: CallbackFn) {
-    this._sendCommands(cmd('next', []), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  previous(callback: CallbackFn) {
-    this._sendCommands(cmd('previous', []), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  setVolumn(value: number, callback: CallbackFn) {
-    this._sendCommands([cmd('setvol', [value])], (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  clearQueue(callback: CallbackFn) {
-    this._sendCommands(cmd('clear', []), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  delete(id: string, callback: CallbackFn) {
-    this._sendCommands(cmd('deleteid', [id]), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  addToQueue(id: string, callback: CallbackFn) {
-    this._sendCommands(cmd('add', [id]), (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  random(callback: CallbackFn) {
-    this._sendCommands([cmd('single', [0]), cmd('repeat', [1]), cmd('random', [1])], (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  single(callback: CallbackFn) {
-    this._sendCommands([cmd('single', [1]), cmd('repeat', [1]), cmd('random', [0])], (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done -> non result
-  repeat(callback: CallbackFn) {
-    this._sendCommands([cmd('single', [0]), cmd('repeat', [1]), cmd('random', [0])], (err) => {
-      if (err) {
-        return callback(err);
-      }
-      callback(null);
-    });
-  }
-  // done
-  getQueue(callback: CallbackFn) {
-    this._sendCommands(cmd('playlistinfo', []), (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      const list: any[] = this._transformList(msg);
-      callback(null, list);
-    });
-  }
-  // done
-  getElapsed(callback: CallbackFn) {
-    this._sendCommands(cmd('status', []), (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      const data = mpd.parseKeyValueMessage(msg);
-      let elapsed = '0';
-      for (const [key, value] of Object.entries(data)) {
-        if (key.toLowerCase() === 'elapsed') {
-          elapsed = value as string;
-          break;
-        }
-      }
-      callback(null, elapsed);
-    });
-  }
-  // done
-  getStatus(callback: CallbackFn) {
-    // , cmd('status', [])
-    this._sendCommands([cmd('currentsong', []), cmd('status', [])], (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      const data = this._transformStatus(msg);
-      callback(null, data);
-    });
-  }
-  // done
-  getLibrary(callback: CallbackFn) {
-    this._sendCommands(cmd('listall', []), (err, msg) => {
-      if (err) {
-        return callback(err);
-      }
-      const list = this._transformList(msg);
-      callback(null, list);
-    });
-  }
-  // done
-  _sendCommands(commands: any, callback: CallbackFn) {
-    try {
-      // debug('_sendCommands', commands);
-      if (this.status !== MPDStatus.READY) callback('Not connected');
-      const cb = (err: Error | null, msg: string) => {
-        // debug('_sendCommands -> result', commands, err, msg);
-        if (err) {
-          debug(err);
-          callback(err);
-        } else {
-          callback(null, msg);
-        }
-      };
 
-      if (Array.isArray(commands)) this.client.sendCommands(commands, cb);
-      else this.client.sendCommand(commands, cb);
-    } catch (err) {
-      callback(err);
+  doAction(type: MessageType, payload: string | null = null) {
+    if (!EXEC_CMD_MAP[type]) {
+      throw new Error(`${type} is not configration in the EXEC_CMD_MAP.`);
     }
+    let processFn = loop;
+    let commands = EXEC_CMD_MAP[type](payload);
+    if (isPlainObject(commands)) {
+      processFn = commands.processFn;
+      commands = commands.command;
+    }
+    debug('doAction %o %o', type, commands);
+    return this.__sendCommands(commands, processFn);
   }
-  _transformList(msg: string) {
-    return mpd
+
+  async __sendCommands(commands: string[] | string, processFn: any = null) {
+    const response: {
+      error: unknown;
+      data: string | null;
+    } = {
+      error: null,
+      data: null,
+    };
+    if (this.status !== MPDStatus.READY) {
+      response.error = new Error('MPD is not connected');
+      return response;
+    }
+
+    try {
+      if (Array.isArray(commands)) {
+        response.data = await this.client.promisifiedSendCommands(commands);
+      } else {
+        response.data = await this.client.promisifiedSendCommand(commands);
+      }
+      
+      if (processFn) {
+        response.data = processFn(response.data as string);
+      }
+    } catch (err) {
+      response.error = err;
+      response.data = null;
+    }
+    return response;
+  }
+
+  static __transformList(msg: string) {
+    // debug('__transformList -> raw message: %o', msg);
+    const formatedValue = mpd
       .parseArrayMessage(msg)
       .map((item: any) => {
         if (isEmpty(item)) {
@@ -239,7 +178,7 @@ class MDPClient {
       })
       .filter((item: any) => item !== null)
       .map((item: any) => {
-        const { id, duration, file } = item;
+        const { id = '', duration = '', file = '' } = item;
         return {
           id,
           file,
@@ -247,14 +186,28 @@ class MDPClient {
           durationLabel: formatTime(duration),
         };
       });
+    return formatedValue;
   }
-  _transformStatus(msg: string) {
+
+  static __transformSongInfo(msg: string) {
     const keyValueObject = mpd.parseKeyValueMessage(msg);
     const formatedValue: any = {};
     for (const [key, value] of Object.entries(keyValueObject)) {
       formatedValue[key.toLowerCase()] = value;
     }
-    const { id, duration, volume, elapsed, random, repeat, state, songid, file, single } = formatedValue;
+    
+    const {
+      id = '',
+      duration = '',
+      volume,
+      elapsed = '',
+      random,
+      repeat,
+      state,
+      songid = '',
+      file = '',
+      single = '0',
+    } = formatedValue;
     return {
       id,
       songid,
@@ -272,4 +225,4 @@ class MDPClient {
   }
 }
 
-export default MDPClient;
+export default MPDClient;

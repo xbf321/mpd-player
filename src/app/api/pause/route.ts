@@ -1,24 +1,11 @@
-// @ts-nocheck
+import rawDebug from 'debug';
+import { MessageType } from '@/lib/constant';
+
+const debug = rawDebug('api:pause');
+
 export async function GET() {
-  const mpd = process.mpdClient;
-  if (!mpd) {
-    return new Response('MPD is not exist.', {
-      status: 200,
-    });
-  }
-  const wrapPromise = () => {
-    return new Promise((resolve, reject) => {
-      mpd.pause((err: Error) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve();
-      });
-    });
-  };
-  const data = await wrapPromise();
-  return new Response(data ? data : 'Operate success.', {
-    status: 200,
-  })
+  const mpd = (process as any).mpdClient;
+  const response = await mpd.doAction(MessageType.REQUEST_PAUSE);
+  debug('response %o', response)
+  return Response.json(response);
 }

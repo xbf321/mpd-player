@@ -1,8 +1,12 @@
 'use client';
 import { useState } from 'react';
-import StatusContext from "./context";
+import CurrentSongContext from './context';
 
 export function Provider({ children, value }) {
-  const [songInfo, setSongInfo] = useState(value);
-  return <StatusContext.Provider value={[songInfo, setSongInfo]}>{children}</StatusContext.Provider>;
+  const [currentSong, setCurrentSong] = useState<SongInfo>(value);
+  return (
+    <CurrentSongContext.Provider value={[currentSong, setCurrentSong]}>
+      {children}
+    </CurrentSongContext.Provider>
+  );
 }

@@ -1,26 +1,14 @@
-// @ts-nocheck
-export async function getStatus() {
-  const mpd = process.mpdClient;
-  if (!mpd) {
-    return null;
-  }
-  const wrapPromise = () => {
-    return new Promise((resolve, reject) => {
-      mpd.getStatus((err: Error, msg) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(msg);
-      });
-    });
-  };
-  const data = await wrapPromise();
-  return data;
+import { MessageType } from '@/lib/constant';
+import rawDebug from 'debug';
+const debug = rawDebug('api:status');
+export async function status(): Promise<InnerResponseType> {
+  const mpd = (process as any).mpdClient;
+  const response = await mpd.doAction(MessageType.REQUEST_STATUS);
+  debug('status %o', response);
+  return response;
 }
+
 export async function GET() {
-  const data = await getStatus();
-  return new Response(data ? data : '', {
-    status: 200,
-  })
+  const response = await status();
+  return Response.json(response);
 }

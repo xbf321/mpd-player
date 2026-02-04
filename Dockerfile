@@ -1,4 +1,4 @@
-FROM node:18-alpine AS base
+FROM node:24-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -36,9 +36,9 @@ RUN adduser --system --uid 1001 nextjs
 
 USER nextjs
 
-EXPOSE 7170
+EXPOSE 7100
 
-ENV PORT=7170
+ENV PORT=7100
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/config/next-config-js/output

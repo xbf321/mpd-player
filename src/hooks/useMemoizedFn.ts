@@ -10,7 +10,6 @@ type PickFunction<T extends noop> = (
 ) => ReturnType<T>;
 
 function useMemoizedFn<T extends noop>(fn: T) {
-
   const fnRef = useRef<T>(fn);
 
   // why not write `fnRef.current = fn`?

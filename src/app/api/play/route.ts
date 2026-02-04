@@ -1,24 +1,11 @@
-// @ts-nocheck
+import rawDebug from 'debug';
+import { MessageType } from '@/lib/constant';
+
+const debug = rawDebug('api:play');
+
 export async function GET() {
-  const mpd = process.mpdClient;
-  if (!mpd) {
-    return new Response('MPD is not exist.', {
-      status: 200,
-    });
-  }
-  const wrapPromise = () => {
-    return new Promise((resolve, reject) => {
-      mpd.play(null, (err: Error) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve();
-      });
-    });
-  };
-  const data = await wrapPromise();
-  return new Response(data ? data : 'Operate success.', {
-    status: 200,
-  })
+  const mpd = (process as any).mpdClient;
+  const response = await mpd.doAction(MessageType.REQUEST_PLAY);
+  debug('response %o', response);
+  return Response.json(response);
 }

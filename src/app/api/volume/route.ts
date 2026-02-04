@@ -1,25 +1,12 @@
-// @ts-nocheck
+import rawDebug from 'debug';
+import { MessageType } from '@/lib/constant';
+const debug = rawDebug('api:volume');
+
 export async function GET(req) {
-  const value = req.nextUrl.searchParams.get('vol')
-  const mpd = process.mpdClient;
-  if (!mpd) {
-    return new Response('MPD is not exist.', {
-      status: 200,
-    });
-  }
-  const wrapPromise = () => {
-    return new Promise((resolve, reject) => {
-      mpd.setVolumn(value, (err: Error) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve();
-      });
-    });
-  };
-  const data = await wrapPromise();
-  return new Response(data ? data : 'Operate success.', {
-    status: 200,
-  });
+  const value = req.nextUrl.searchParams.get('vol');
+
+  const mpd = (process as any).mpdClient;
+  const response = await mpd.doAction(MessageType.REQUEST_SET_VOL, value);
+  debug('response %o', response);
+  return Response.json(response);
 }

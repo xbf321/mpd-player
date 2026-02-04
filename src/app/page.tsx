@@ -1,17 +1,17 @@
 'use client';
 import clsx from 'clsx';
-import { useState, useEffect, useContext } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
+import { useState, useEffect, useContext } from 'react';
 
+import Button from '@/components/Button';
 import SongList from '@/components/SongList';
+import Player from '@/components/Player';
 import Stepper, { StepperStatus } from '@/components/Stepper';
-import Player, { PlayStatus } from '@/components/Player';
 
 import { socket } from '@/socket';
+import CurrentSongContext from './context';
 import useInterval from '@/hooks/useInterval';
-import { MessageType, MPDStatus } from '@/lib/constant';
-
-import StatusContext from './context';
+import { MessageType, MPDStatus, PlayStatus } from '@/lib/constant';
 
 enum TabType {
   Queue = 0,
@@ -19,29 +19,22 @@ enum TabType {
 }
 
 export default function Home() {
-  // done
-  const [songInfo, setSongInfo] = useContext(StatusContext);
-  // done
-  const [selectedTab, setSelectedTab] = useState(TabType.Queue);
+  const [currentSong, setCurrentSong] = useContext(CurrentSongContext);
   const [stepperInfo, setStepperInfo] = useState({
     socketReady: false,
     mpdReady: false,
     current: 0,
   });
-  // done
-  const [currentPlaySongId, setCurrentPlaySongId] = useState(-1);
-  // done
+  const [selectedTab, setSelectedTab] = useState(TabType.Queue);
   const [queue, setQueue] = useState<{ loading: boolean; data: Queue[] }>({
     loading: true,
     data: [],
   });
-  // done
   const [libray, setLibray] = useState<{ loading: boolean; data: Library[] }>({
     loading: true,
     data: [],
   });
 
-  // done
   const stepItems = [
     {
       title: stepperInfo.socketReady ? 'Network Connected' : 'Checking Network...',
@@ -49,24 +42,17 @@ export default function Home() {
     },
   ];
 
-  // done
   useInterval(() => {
-    if (!songInfo) {
+    if (!currentSong) {
       return;
     }
-    const { state } = songInfo;
+    const { state } = currentSong;
     if (state !== PlayStatus.PLAY) {
       return;
     }
     sendMessage(MessageType.REQUEST_STATUS);
   }, 1000);
 
-  // done
-  useInterval(() => {
-    sendMessage(MessageType.MPD_HEART);
-  }, 10000);
-
-  // done
   useEffect(() => {
     const onConnect = () => {
       setStepperInfo({
@@ -99,7 +85,6 @@ export default function Home() {
     };
   }, []);
 
-  // done
   const sendMessage = (type = '', data: number | string | null = null) => {
     const msg = {
       type: type,
@@ -113,16 +98,16 @@ export default function Home() {
 
   const receiveMessage = (msg: string) => {
     const { type, payload: data } = JSON.parse(msg);
-    console.info('receiveMessage', type, data);
+    console.log('receiveMessage', type, data);
     switch (type) {
       case MessageType.STATUS:
         {
-          const updateSongInfo = {
-            ...songInfo,
-            ...data,
-          };
-          setSongInfo(updateSongInfo);
-          setCurrentPlaySongId(data?.id || -1);
+          setCurrentSong((item: SongInfo) => {
+            return {
+              ...item,
+              ...data,
+            };
+          });
         }
         break;
       case MessageType.QUEUE:
@@ -141,7 +126,7 @@ export default function Home() {
       case MessageType.MPD_ERROR:
         toast.error(data);
         break;
-      case MessageType.MPD_OFFLINE:
+      case MessageType.MPD_STATUS:
         if (Number(data) === MPDStatus.READY) {
           return;
         }
@@ -153,48 +138,10 @@ export default function Home() {
     }
   };
 
-  // done
-  const handlePlayback = (
-    type: MessageType = MessageType.MESSAGE_EVENT,
-    data: string | number | null = null,
-  ) => {
-    switch (type) {
-      case MessageType.PLAY:
-        sendMessage(MessageType.PLAY, data);
-        break;
-      case MessageType.PREVIOUS:
-        sendMessage(MessageType.PREVIOUS);
-        break;
-      case MessageType.NEXT:
-        sendMessage(MessageType.NEXT);
-        break;
-      case MessageType.PAUSE:
-        sendMessage(MessageType.PAUSE);
-        break;
-      case MessageType.SET_VOL:
-        sendMessage(MessageType.SET_VOL, data);
-        break;
-      case MessageType.DELETE:
-        sendMessage(MessageType.DELETE, data);
-        break;
-      case MessageType.SINGLE:
-        sendMessage(MessageType.SINGLE);
-        break;
-      case MessageType.RANDOM:
-        sendMessage(MessageType.RANDOM);
-        break;
-      case MessageType.REPEAT:
-        sendMessage(MessageType.REPEAT);
-        break;
-    }
-  };
-
-  // done
   const handleTabChange = (value: number) => {
     setSelectedTab(value);
   };
 
-  // done
   const handleClearQueue = () => {
     if (queue.data?.length === 0) {
       return;
@@ -202,9 +149,8 @@ export default function Home() {
     sendMessage(MessageType.REQUEST_CLEAR_QUEUE);
   };
 
-  // done
   const handleAddToQueue = (item: Library) => {
-    sendMessage(MessageType.ADD_TO_QUEUE, item.file);
+    sendMessage(MessageType.REQUEST_ADD_TO_QUEUE, item.file);
   };
 
   return (
@@ -217,37 +163,32 @@ export default function Home() {
         })}
       />
       <Player
-        data={songInfo}
-        onPlay={() => handlePlayback(MessageType.PLAY)}
-        onPause={() => handlePlayback(MessageType.PAUSE)}
-        onNext={() => handlePlayback(MessageType.NEXT)}
-        onPrevious={() => handlePlayback(MessageType.PREVIOUS)}
-        onVolumn={(value) => handlePlayback(MessageType.SET_VOL, value)}
-        onLoopStatus={(status) => handlePlayback(MessageType[status])}
+        data={currentSong as SongInfo}
+        doAction={(messageType, data) => sendMessage(messageType, data)}
       />
       <div className="flex text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700 mb-3">
         <ul className="flex-1 flex flex-wrap -mb-px">
-          <li className="me-2" onClick={() => handleTabChange(0)}>
+          <li className="me-2" onClick={() => handleTabChange(TabType.Queue)}>
             <a
               className={clsx({
                 'inline-block p-2 border-b-2 rounded-t-lg cursor-pointer': true,
                 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300':
-                  selectedTab !== 0,
+                  selectedTab !== TabType.Queue,
                 'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500':
-                  selectedTab === 0,
+                  selectedTab === TabType.Queue,
               })}
             >
               Queue
             </a>
           </li>
-          <li className="me-2" onClick={() => handleTabChange(1)}>
+          <li className="me-2" onClick={() => handleTabChange(TabType.Libray)}>
             <a
               className={clsx({
                 'inline-block p-2 border-b-2 rounded-t-lg cursor-pointer': true,
                 'hover:text-gray-600 hover:border-gray-300 border-transparent dark:hover:text-gray-300':
-                  selectedTab !== 1,
+                  selectedTab !== TabType.Libray,
                 'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500':
-                  selectedTab === 1,
+                  selectedTab === TabType.Libray,
               })}
             >
               Libray
@@ -266,19 +207,26 @@ export default function Home() {
       <div className="flex-1 overflow-auto">
         {selectedTab === TabType.Queue && (
           <SongList
-            playId={currentPlaySongId}
+            playId={(currentSong as SongInfo)?.songid}
             loading={queue.loading}
             data={queue.data}
             showIcon={true}
-            onSelect={(id) => handlePlayback(MessageType.PLAY, id)}
+            onSelect={(id) => sendMessage(MessageType.REQUEST_PLAY, id)}
             extra={(item: Queue) => (
               <>
-                <span
-                  className="material-symbols-outlined cursor-pointer"
-                  onClick={() => handlePlayback(MessageType.DELETE, item.id)}
-                >
-                  delete
-                </span>
+                <Button onClick={() => sendMessage(MessageType.REQUEST_DELETE, item.id)}>
+                  <svg
+                    viewBox="64 64 896 896"
+                    focusable="false"
+                    data-icon="delete"
+                    width="1.5em"
+                    height="1.5em"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M864 256H736v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32zm-200 0H360v-72h304v72z"></path>
+                  </svg>
+                </Button>
                 <span>{item.durationLabel}</span>
               </>
             )}
@@ -291,12 +239,19 @@ export default function Home() {
             data={libray.data}
             extra={(item: Library) => (
               <>
-                <span
-                  className="material-symbols-outlined cursor-pointer"
-                  onClick={() => handleAddToQueue(item)}
-                >
-                  add
-                </span>
+                <Button onClick={() => handleAddToQueue(item)}>
+                  <svg
+                    viewBox="64 64 896 896"
+                    focusable="false"
+                    data-icon="plus-circle"
+                    width="1.5em"
+                    height="1.5em"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm192 472c0 4.4-3.6 8-8 8H544v152c0 4.4-3.6 8-8 8h-48c-4.4 0-8-3.6-8-8V544H328c-4.4 0-8-3.6-8-8v-48c0-4.4 3.6-8 8-8h152V328c0-4.4 3.6-8 8-8h48c4.4 0 8 3.6 8 8v152h152c4.4 0 8 3.6 8 8v48z"></path>
+                  </svg>
+                </Button>
               </>
             )}
           />

@@ -1,8 +1,9 @@
-// @ts-nocheck
+import rawDebug from 'debug';
 import { Server } from 'socket.io';
-import { MessageType } from './constant';
+import { MessageType, PlayStatus } from './constant';
 
-const debug = require('debug')('player:socket.io');
+const debug = rawDebug('socket-server');
+
 const objectToLowerCase = (data) => {
   if (!data) {
     return data;
@@ -18,9 +19,11 @@ const objectToLowerCase = (data) => {
     return data;
   }
 };
-class SocketIO {
-  mpd = null;
-  socket = null;
+
+class SocketServer {
+  private __mpd;
+  private __io;
+  private __socket;
   constructor(httpServer, mpd) {
     const io = new Server(httpServer, {
       addTrailingSlash: false,
@@ -29,189 +32,100 @@ class SocketIO {
         methods: ['GET', 'POST'],
       },
     });
+
     io.on('connection', (socket) => {
-      this.socket = socket;
+      this.__socket = socket;
       debug('scoketServer -> connection');
-      socket.on(MessageType.MESSAGE_EVENT, (type, data) => this.recieveMessage(type, data));
+      socket.on(MessageType.MESSAGE_EVENT, (msg: string) => this.recieveMessage(msg));
+
+      socket.on('disconnect', () => {
+        debug('scoketServer -> disconnect');
+        this.sendMessage(MessageType.MPD_STATUS, this.__mpd.status);
+      });
     });
-    mpd.onSystemChange((name) => {
-      debug('MPDSystem update received: ' + name);
+
+    mpd.onSystemChange(async (name) => {
+      debug('MPDSystem update received: %o', name);
       if (name === 'player' || name === 'mixer') {
-        this.mpd.getStatus((err, status) => {
-          if (err) {
-            return;
-          }
-          this.sendMessage(MessageType.STATUS, status);
-        });
+        const { error, data } = await this.__mpd.doAction(MessageType.REQUEST_STATUS);
+        if (error) {
+          return;
+        }
+        this.sendMessage(MessageType.STATUS, data);
       }
       if (name === 'playlist') {
-        this.mpd.getQueue((err, list) => {
-          if (err) {
-            return;
-          }
-          this.sendMessage(MessageType.QUEUE, list);
-        });
+        const { error, data } = await this.__mpd.doAction(MessageType.REQUEST_QUEUE);
+        if (error) {
+          return;
+        }
+        this.sendMessage(MessageType.QUEUE, data);
       }
       if (name === 'update') {
-        this.mpd.getLibrary((err, list) => {
-          if (err) {
-            return;
-          }
-          this.sendMessage(MessageType.LIBRARY, list);
-        });
+        const { error, data } = await this.__mpd.doAction(MessageType.REQUEST_LIBRARY);
+        if (error) {
+          return;
+        }
+        this.sendMessage(MessageType.LIBRARY, data);
       }
     });
-    this.io = io;
-    this.mpd = mpd;
+
+    this.__io = io;
+    this.__mpd = mpd;
   }
 
   broadcastMessage(type, rawData) {
     const data = objectToLowerCase(rawData);
     debug('Broadcast: ' + type + ' with %o', data);
-    this.io.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
+    this.__io.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
-  sendError(err) {
-    this.sendMessage(MessageType.MPD_ERROR, err.message);
-  }
+
   serializeMessage(type, data) {
     return JSON.stringify({
-      type: type,
+      type,
       payload: data ? data : null,
     });
   }
-  sendMessage(type, data) {
-    if (!this.socket) {
-      debug('this.socket is null');
+
+  sendMessage(type, data = null) {
+    if (!this.__socket) {
+      debug('this.__socket is null');
       return;
     }
-    this.socket.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
+    debug(`sendMessage, type:${type}, %o`, data);
+    this.__socket.emit(MessageType.MESSAGE_EVENT, this.serializeMessage(type, data));
   }
-  recieveMessage(msg) {
-    debug('Received %s', msg);
-    const { type, payload: data } = JSON.parse(msg);
+
+  async recieveMessage(msg) {
+    debug('Received %o', msg);
+    const { type, payload } = JSON.parse(msg);
+
+    if (type === MessageType.REQUEST_MPD_STATUS) {
+      return this.sendMessage(MessageType.MPD_STATUS, this.__mpd.status);
+    }
+
+    const { error, data } = await this.__mpd.doAction(type, payload);
+    if (error) {
+      this.sendMessage(MessageType.MPD_ERROR, error.message);
+      return;
+    }
     switch (type) {
-      case MessageType.PLAY:
-        this.mpd.play(data, (err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.PAUSE:
-        this.mpd.pause((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.SET_VOL:
-        this.mpd.setVolumn(data, (err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.SINGLE:
-        this.mpd.single((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.RANDOM:
-        this.mpd.random((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.REPEAT:
-        this.mpd.repeat((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.DELETE:
-        this.mpd.delete(data, (err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.OPERATION_SUCCESS);
-        });
-        break;
-      case MessageType.PREVIOUS:
-        this.mpd.previous((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
-        break;
-      case MessageType.NEXT:
-        this.mpd.next((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
+      case MessageType.REQUEST_DELETE:
+        this.sendMessage(MessageType.OPERATION_SUCCESS);
         break;
       case MessageType.REQUEST_STATUS:
-        this.mpd.getStatus((err, status) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.STATUS, status);
-        });
+        this.sendMessage(MessageType.STATUS, data);
         break;
       case MessageType.REQUEST_QUEUE:
-        this.mpd.getQueue((err, list) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.QUEUE, list);
-        });
-        break;
-      case MessageType.REQUEST_CLEAR_QUEUE:
-        this.mpd.clearQueue((err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-        });
+        this.sendMessage(MessageType.QUEUE, data);
         break;
       case MessageType.REQUEST_LIBRARY:
-        this.mpd.getLibrary((err, list) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.LIBRARY, list);
-        });
+        this.sendMessage(MessageType.LIBRARY, data);
         break;
-      case MessageType.ADD_TO_QUEUE:
-        this.mpd.addToQueue(data, (err) => {
-          if (err) {
-            this.sendError(err);
-            return;
-          }
-          this.sendMessage(MessageType.OPERATION_SUCCESS);
-        });
-        break;
-      case MessageType.MPD_HEART:
-        this.sendMessage(MessageType.MPD_OFFLINE, this.mpd.status);
+      case MessageType.REQUEST_ADD_TO_QUEUE:
+        this.sendMessage(MessageType.OPERATION_SUCCESS);
         break;
     }
   }
 }
 
-export default SocketIO;
+export default SocketServer;

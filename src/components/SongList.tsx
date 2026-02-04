@@ -1,9 +1,9 @@
-'use client';
-import { toInteger } from 'lodash';
 import clsx from 'clsx';
-import Empty from './Empty';
-import Skeleton from './Skeleton';
+import { toInteger } from 'lodash';
 
+import Empty from './Empty';
+import Button from './Button';
+import Skeleton from './Skeleton';
 
 export default function SongList({
   loading = true,
@@ -23,7 +23,7 @@ export default function SongList({
   if (loading) {
     return <Skeleton />;
   }
-  if (data?.length === 0) {
+  if (!data || data?.length === 0) {
     return <Empty description="空空如也" />;
   }
   return (
@@ -31,20 +31,26 @@ export default function SongList({
       {data.map((item, index) => {
         const selected = toInteger(item.id) === toInteger(playId);
         return (
-          <div className={clsx({
-            'flex gap gap-3 pb-2': true,
-            'border-b border-gray-200': index !== data.length -1 
-          })} key={index}>
+          <div
+            className={clsx({
+              'flex gap-3 pb-2': true,
+              'border-b border-gray-200': index !== data.length - 1,
+            })}
+            key={index}
+          >
             {showIcon && (
-              <span
-                className={clsx({
-                  'material-symbols-outlined cursor-pointer': true,
-                  '!text-gray-500': selected,
-                })}
-                onClick={() => onSelect?.(item?.id)}
-              >
-                play_circle
-              </span>
+              <Button onClick={() => onSelect?.(item?.id)}>
+                <svg
+                  viewBox="64 64 896 896"
+                  focusable="false"
+                  width="1.5em"
+                  height="1.5em"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm144.1 454.9L437.7 677.8a8.02 8.02 0 01-12.7-6.5V353.7a8 8 0 0112.7-6.5L656.1 506a7.9 7.9 0 010 12.9z"></path>
+                </svg>
+              </Button>
             )}
             <div
               className={clsx({
